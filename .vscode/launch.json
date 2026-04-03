@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:LGTV_Swift}",
+            "name": "Debug LGNetCastRemote",
+            "target": "LGNetCastRemote",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug LGNetCastRemote"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:LGTV_Swift}",
+            "name": "Release LGNetCastRemote",
+            "target": "LGNetCastRemote",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release LGNetCastRemote"
+        }
+    ]
+}

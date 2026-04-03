@@ -1,0 +1,28 @@
+# Swift / SPM
+.build/
+*.o
+*.d
+*.swp
+*.lock
+Package.resolved
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+*.xcscheme
+DerivedData/
+.swiftpm/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Compiled binary
+LGNetCastRemote
+
+# Logs & temp
+*.log
+*.tmp
