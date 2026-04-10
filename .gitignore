@@ -22,6 +22,7 @@ DerivedData/
 
 # Compiled binary
 LGNetCastRemote
+LGNetCastRemote.app/
 
 # Logs & temp
 *.log

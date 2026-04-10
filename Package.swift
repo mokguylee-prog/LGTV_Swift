@@ -9,7 +9,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "LGNetCastRemote",
-            path: "Sources/LGNetCastRemote"
+            path: "Sources/LGNetCastRemote",
+            resources: [
+                .process("Resources")
+            ]
         )
     ]
 )

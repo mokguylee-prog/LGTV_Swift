@@ -7,6 +7,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+BACKUP_SCRIPT="$SCRIPT_DIR/backup.sh"
+
 # Package.swift 에서 프로젝트 이름 추출
 PROJECT_NAME="$(grep -m1 'name:' Package.swift | sed 's/.*name:[[:space:]]*"\(.*\)".*/\1/')"
 
@@ -78,3 +80,12 @@ cp "$BINARY_PATH" "$SCRIPT_DIR/$PROJECT_NAME"
 
 echo "✓  앱 번들: $APP_DIR"
 echo "✓  바이너리: $SCRIPT_DIR/$PROJECT_NAME"
+
+if [[ -x "$BACKUP_SCRIPT" ]]; then
+  echo "▶  빌드 후 백업 실행"
+  "$BACKUP_SCRIPT"
+elif [[ -f "$BACKUP_SCRIPT" ]]; then
+  echo "⚠️  backup.sh 실행 권한이 없어 백업을 건너뜁니다."
+else
+  echo "⚠️  backup.sh 를 찾을 수 없어 백업을 건너뜁니다."
+fi

@@ -2,15 +2,13 @@
 
 LG NetCast TV (레거시 HDCP API) 를 macOS 메뉴바에서 제어하는 네이티브 Swift 앱입니다.
 
-> 대상 기기: LG NetCast TV (42LW5700 등, 2012년 이전 모델) — 포트 8080 HDCP API 사용
+> 대상 기기: LG NetCast TV (42LW5700 등, 2014년 이전 모델) — 포트 8080 HDCP API 사용
 
 ---
 
 ## 스크린샷
 
-![리모컨](image/스크린샷%202026-03-18%20오후%2011.55.38.png)
-
-![리모컨](image/스크린샷%202026-04-04%20오후%202.12.47.png)
+![메뉴바](image/MenuBar.png) ![리모컨](image/Remocon.png)
 
 ---
 
@@ -27,7 +25,7 @@ LG NetCast TV (레거시 HDCP API) 를 macOS 메뉴바에서 제어하는 네이
 ## 빌드 및 실행
 
 ```bash
-# 빌드 (release, .app 번들 자동 생성)
+# 빌드 (release, .app 번들 자동 생성 후 ZIP 백업 실행)
 ./build.sh
 
 # 빌드 후 바로 실행
@@ -36,12 +34,16 @@ LG NetCast TV (레거시 HDCP API) 를 macOS 메뉴바에서 제어하는 네이
 # debug 모드
 ./build.sh debug
 ./run.sh debug
+
+# SPM으로 바로 실행 (개발용)
+swift run
 ```
 
 빌드 완료 후 프로젝트 루트에 생성되는 파일:
 
 - `LGNetCastRemote.app` — Finder에서 더블클릭으로 실행 가능한 앱 번들
 - `LGNetCastRemote` — 단독 바이너리 (참고용)
+- `../LGNetCastRemote_YYYYMMDD_HHMMSS_.zip` — 빌드 완료 후 자동 생성되는 프로젝트 백업 ZIP
 
 ### Xcode에서 열기
 
@@ -53,10 +55,10 @@ open Package.swift
 
 ## 사용 방법
 
-1. **앱 실행** → 메뉴바에 TV 아이콘 표시
-2. **리모컨 열기** → 메뉴바 아이콘 클릭 → "리모컨 열기"
-3. **TV IP 입력** 또는 **검색** 버튼으로 자동 탐색
-4. **PIN 요청** → TV 화면에 PIN 표시됨
+1. **앱 실행** → 메뉴바에 LG 아이콘 표시
+2. **자동 연결** → 저장된 IP·PIN이 있으면 시작 시 자동 연결, PIN이 없으면 TV 화면에 자동으로 PIN 표시 요청
+3. **리모컨 열기** → 메뉴바 아이콘 클릭 → "리모컨 열기"
+4. **TV 검색** → 검색 버튼으로 네트워크 자동 탐색 (SSDP → B-SEARCH → 포트 스캔 순)
 5. **PIN 입력 후 연결** → 리모컨 버튼 활성화
 6. 이후 실행 시 저장된 IP·PIN으로 **자동 연결**
 
@@ -81,9 +83,11 @@ open Package.swift
 
 ## 기기 자동 탐색 순서
 
-1. **SSDP M-SEARCH** — UDP 멀티캐스트 `239.255.255.250:1900`
+1. **SSDP M-SEARCH** — UDP 멀티캐스트 `239.255.255.250:1900` (5초 대기)
 2. **B-SEARCH** — UDP 브로드캐스트 `255.255.255.255:1990`
-3. **포트 스캔** — 로컬 `/24` 서브넷 전체 TCP 8080 확인
+3. **포트 스캔** — 활성 네트워크 인터페이스(`en*`) 전체 `/24` 서브넷 TCP 8080 확인
+
+저장된 IP가 있으면 탐색 결과와 무관하게 항상 후보로 포함됩니다.
 
 ---
 
@@ -93,21 +97,24 @@ open Package.swift
 LGTV_Swift/
 ├── Package.swift
 ├── Sources/LGNetCastRemote/
-│   ├── LGNetCastApp.swift       # @main, MenuBarExtra, AppDelegate
-│   ├── TVController.swift       # 네트워크 통신, 인증, 키 전송
-│   ├── SSDPDiscovery.swift      # 기기 자동 탐색
-│   ├── KeyMap.swift             # LGKey enum (키 코드 매핑)
-│   ├── TVState.swift            # 모델: ConnectionState, TVDevice
-│   ├── StateManager.swift       # JSON 설정 저장/불러오기
-│   ├── LaunchAgentManager.swift # 로그인 시 자동 시작
-│   ├── MenuBarView.swift        # 메뉴바 팝업 UI
-│   ├── ConnectionView.swift     # IP·PIN 연결 패널
-│   └── RemoteView.swift         # 전체 리모컨 스킨
-├── assets/                      # 앱 아이콘 (LGNetCast.icns 등)
-├── ref/                         # 원본 Python 참조 파일
-├── build.sh                     # 빌드 + .app 번들 생성
-├── run.sh                       # 빌드 후 실행
-└── backup.sh                    # 프로젝트 ZIP 백업
+│   ├── LGNetCastApp.swift           # @main, MenuBarExtra, AppDelegate
+│   ├── TVController.swift           # 네트워크 통신, 인증, 키 전송, 기기 탐색
+│   ├── SSDPDiscovery.swift          # SSDP / B-SEARCH / 포트 스캔
+│   ├── KeyMap.swift                 # LGKey enum (키 코드 매핑)
+│   ├── TVState.swift                # 모델: ConnectionState, TVDevice
+│   ├── StateManager.swift           # JSON 설정 저장/불러오기
+│   ├── LaunchAgentManager.swift     # 로그인 시 자동 시작
+│   ├── MenuBarView.swift            # 메뉴바 팝업 UI
+│   ├── ConnectionView.swift         # IP·PIN 연결 패널
+│   ├── RemoteView.swift             # 전체 리모컨 스킨
+│   └── Resources/
+│       ├── LGNetCast.icns           # 앱 아이콘
+│       └── lg_menu_icon.png         # 메뉴바 아이콘 (22×22)
+├── assets/                          # 원본 아이콘 소스 (iconset 포함)
+├── image/                           # 스크린샷 및 로고
+├── build.sh                         # 빌드 + .app 번들 생성
+├── run.sh                           # 빌드 후 실행
+└── backup.sh                        # 프로젝트 ZIP 백업
 ```
 
 ---
