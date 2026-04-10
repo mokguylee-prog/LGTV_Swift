@@ -56,11 +56,26 @@ open Package.swift
 ## 사용 방법
 
 1. **앱 실행** → 메뉴바에 LG 아이콘 표시
-2. **자동 연결** → 저장된 IP·PIN이 있으면 시작 시 자동 연결, PIN이 없으면 TV 화면에 자동으로 PIN 표시 요청
+2. **자동 연결** → 저장된 IP·PIN이 있으면 시작 시 자동 연결  
+   PIN이 없으면 TV 화면에 자동으로 PIN 표시 요청
 3. **리모컨 열기** → 메뉴바 아이콘 클릭 → "리모컨 열기"
 4. **TV 검색** → 검색 버튼으로 네트워크 자동 탐색 (SSDP → B-SEARCH → 포트 스캔 순)
 5. **PIN 입력 후 연결** → 리모컨 버튼 활성화
 6. 이후 실행 시 저장된 IP·PIN으로 **자동 연결**
+
+---
+
+## 메뉴바 퀵버튼
+
+연결 시 메뉴바 팝업에 퀵버튼이 표시됩니다.
+
+| 버튼 | 기능 | 색상 |
+|---|---|---|
+| 🔇 | Mute | 노란색 |
+| 🔉 🔊 | 볼륨 +/- | 흰색 |
+| CH ∧ / CH ∨ | 채널 업/다운 | 파란색 |
+
+볼륨·채널 버튼은 꾹 누르면 연속 입력됩니다.
 
 ---
 
@@ -104,12 +119,12 @@ LGTV_Swift/
 │   ├── TVState.swift                # 모델: ConnectionState, TVDevice
 │   ├── StateManager.swift           # JSON 설정 저장/불러오기
 │   ├── LaunchAgentManager.swift     # 로그인 시 자동 시작
-│   ├── MenuBarView.swift            # 메뉴바 팝업 UI
+│   ├── MenuBarView.swift            # 메뉴바 팝업 UI (퀵버튼 포함)
 │   ├── ConnectionView.swift         # IP·PIN 연결 패널
 │   ├── RemoteView.swift             # 전체 리모컨 스킨
 │   └── Resources/
-│       ├── LGNetCast.icns           # 앱 아이콘
-│       └── lg_menu_icon.png         # 메뉴바 아이콘 (22×22)
+│       ├── LGNetCast.icns           # 앱 아이콘 (LG 로고)
+│       └── lg_menu_icon.png         # 메뉴바 아이콘 (22×22, LG 로고)
 ├── assets/                          # 원본 아이콘 소스 (iconset 포함)
 ├── image/                           # 스크린샷 및 로고
 ├── build.sh                         # 빌드 + .app 번들 생성
