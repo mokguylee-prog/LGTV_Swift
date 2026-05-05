@@ -36,17 +36,17 @@ struct LGNetCastApp: App {
 private struct MenuBarIcon: View {
     var body: some View {
         Image(nsImage: Self.menuIcon)
-            .resizable()
-            .aspectRatio(contentMode: .fit)
-            .frame(width: 22, height: 22)
     }
 
     static let menuIcon: NSImage = {
         if let url = Bundle.module.url(forResource: "lg_menu_icon", withExtension: "png"),
            let img = NSImage(contentsOf: url) {
+            img.size = NSSize(width: 20, height: 20)
             return img
         }
-        return NSImage(systemSymbolName: "tv", accessibilityDescription: nil)!
+        let img = NSImage(systemSymbolName: "tv", accessibilityDescription: nil)!
+        img.size = NSSize(width: 20, height: 20)
+        return img
     }()
 }
 
@@ -60,11 +60,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 앱 아이콘을 번들의 LG 로고로 설정
         if let url = Bundle.module.url(forResource: "LGNetCast", withExtension: "icns"),
            let icon = NSImage(contentsOf: url) {
-            NSApp.applicationIconImage = icon
+            let s = icon.size
+            NSApp.applicationIconImage = icon.resized(to: NSSize(width: s.width * 0.49, height: s.height * 0.49))
         }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false   // keep running when the remote window is closed
+    }
+}
+
+private extension NSImage {
+    func resized(to newSize: NSSize) -> NSImage {
+        let result = NSImage(size: newSize)
+        result.lockFocus()
+        draw(in: NSRect(origin: .zero, size: newSize),
+             from: NSRect(origin: .zero, size: size),
+             operation: .copy, fraction: 1.0)
+        result.unlockFocus()
+        return result
     }
 }
