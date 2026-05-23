@@ -1,30 +1,33 @@
 ---
 name: mainactor-portlog-heisenbug
-description: "TVController portLog @MainActor 과부하로 verifyLGTV URLSession 타임아웃 발생 — TV 검색 결과 빈 목록 버그 (Heisenbug, 50회 이상 분석 끝에 발견)"
+description: "TVController verifyLGTV @MainActor 직렬화로 TV 검색 결과 빈 목록 버그 — nonisolated 전환으로 수정 완료 (50회 이상 분석, 2026-05-23)"
 metadata: 
   node_type: memory
   type: project
   originSessionId: f7a63ef9-fff9-4e82-80b8-a53b442afdb5
 ---
 
-## ✅ 진짜 원인 확정: build.sh codesign 누락 (아래 참조)
+## ✅ 최종 수정 완료 (2026-05-23)
 
 ## 버그: TV 검색 버튼 눌러도 목록에 아무것도 안 뜸
 
 **증상**: `discover()` 실행 후 `discoveredDevices`가 비어 있음. 코드는 컴파일 성공, v0516은 정상 동작.
 
-**근본 원인**: `portScanOnly` progress 콜백이 IP 1개당 `Task { @MainActor }` 1개 생성 (254개 subnet 기준 254개). 각 Task가 `portLog.append` → `objectWillChange` → `ConnectionWindowView`의 `.onChange(of: tv.portLog.count)` → `proxy.scrollTo(last, anchor: .bottom)` 애니메이션 호출. 254개 애니메이션이 main actor를 수 초간 점유 → `verifyLGTV` 내부 `URLSession.data(for:)` 완료 콜백이 main actor에 복귀하지 못하고 2초 `timeoutInterval` 초과 → 모든 HTTP 검증 실패.
+**근본 원인 (최종 확정)**: `buildDevices` 내 `withTaskGroup` child task들이 `verifyLGTV`를 호출할 때 `@MainActor`를 통해 직렬화됨. `TVController`가 `@MainActor` 클래스이므로 `verifyLGTV`도 기본적으로 main actor 격리. `withTaskGroup` child task가 `await self.verifyLGTV(...)` 호출 시 main actor로 hop 필요 → 모든 검증 task가 사실상 직렬화 → 동시성 없이 순차 실행 → `portScanOnly` progress 콜백의 `Task { @MainActor portLog.append }` 들이 main actor queue에 쌓인 상태에서 경쟁 → verifyLGTV의 URLSession.data 콜백이 main actor 복귀 못하고 타임아웃.
 
-**왜 Heisenbug인가**: 디버그 print문을 추가하면 main actor에 실행 여유가 생겨 portLog Task들이 먼저 소화되고 verifyLGTV가 정상 동작함.
+**왜 Heisenbug였나**: print문이 child task 간 타이밍을 바꿔 main actor queue가 소화될 틈을 줬기 때문.
+
+**수정 방법**: `verifyLGTV`, `isPortOpen`, `parseTag`, `looksLikeLGServer`, `looksLikePrinter`, `printerModel`을 모두 `nonisolated`로 선언.
+- `nonisolated`로 선언된 async 함수를 actor-isolated 컨텍스트에서 `await` 호출하면 Swift가 cooperative thread pool로 전환 — main actor 불필요
+- `session`은 `let` 속성이므로 `nonisolated`에서 안전하게 접근 가능
+- 모든 `[DBG]` print 문 제거
 
 **핵심 패턴 (이 프로젝트 전반에 주의)**:
-- `TVController`는 `@MainActor` 클래스
-- `verifyLGTV` 내 모든 `URLSession.data(for:)` 호출은 main actor 복귀 필요
-- `portLog.append` 같은 `@Published` 배열 변경이 SwiftUI `.onChange` 애니메이션을 유발하면 main actor를 수 초 점유 가능
-- `timeoutInterval: 2`초 짜리 HTTP 요청은 main actor 대기 중 쉽게 타임아웃
+- `@MainActor` 클래스에서 `withTaskGroup` + async HTTP 검증 패턴 쓸 때: 검증 함수를 반드시 `nonisolated`로 선언해 thread pool에서 병렬 실행되도록 할 것
+- `let` 속성 (`URLSession`, 설정값 등)은 `nonisolated` 함수에서 안전하게 참조 가능
+- `@Published var` 속성은 `nonisolated` 함수에서 직접 접근 불가 → 파라미터로 전달하거나 main actor에서 읽어서 넘길 것
+- `portLog` 같은 `@Published` 배열 고빈도 append + SwiftUI `.onChange` 애니메이션 조합은 main actor 과부하 유발 가능 — rate limiting 유지
 
-**현재 상태**: 정확한 수정 방법 미확정. 임시 workaround로 `buildDevices` 진입 전후에 `print("[DBG] ...")` 문을 남겨 두면 정상 동작함 (Heisenbug 특성상 print문이 main actor 스케줄링 타이밍을 변화시켜 증상 해소). print문 제거 시 재현됨. 근본 fix는 추가 분석 필요.
+**Why**: 정상 동작 버전(v0516)에는 portLog 자체와 DeviceKind 검증이 없었음.
 
-**Why**: 정상 동작 버전(v0516)에는 portLog 자체가 없었음. portLog + 실시간 스크롤 애니메이션 UI를 추가하면서 이 문제 발생.
-
-**How to apply**: 향후 `@Published` 배열에 고빈도 append + SwiftUI `.onChange` 애니메이션 패턴 조합을 쓸 때, main actor에서 실행되는 async HTTP 요청과 충돌하는지 반드시 검토. 특히 `URLSession` timeout이 짧은 경우 위험.
+**How to apply**: 새 검증/HTTP 함수 추가 시 `nonisolated private func` 패턴 사용. `buildDevices` 구조 건드릴 때 child task에서 main actor hop 없이 동작하는지 확인.

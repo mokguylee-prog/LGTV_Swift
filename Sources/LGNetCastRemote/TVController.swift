@@ -64,7 +64,7 @@ class TVController: ObservableObject {
 
     /// macOS에서 SO_SNDTIMEO는 connect()에 적용되지 않으므로
     /// non-blocking socket + select()로 타임아웃을 직접 제어한다.
-    private func isPortOpen(ip: String, timeoutMs: Int = 2000) async -> Bool {
+    nonisolated private func isPortOpen(ip: String, timeoutMs: Int = 2000) async -> Bool {
         await withCheckedContinuation { cont in
             Task.detached {
                 let sock = socket(AF_INET, SOCK_STREAM, 0)
@@ -259,16 +259,12 @@ class TVController: ObservableObject {
         var seen: [String: SSDPCandidate] = [:]
         for c in await ssdpCandidates { seen[c.ip] = seen[c.ip] ?? c }
         ssdpDone = true
-        print("[DBG] SSDP candidates: \(seen.keys.sorted())")
         for c in await scanCandidates { seen[c.ip] = seen[c.ip] ?? c }
-        print("[DBG] After port scan, total candidates: \(seen.count), IPs: \(seen.keys.sorted())")
 
         var candidates = Array(seen.values)
         candidates = mergePreferredCandidate(preferredIP, into: candidates)
-        print("[DBG] After merge (preferredIP=\(preferredIP)): \(candidates.map(\.ip))")
 
         let devices = await buildDevices(from: candidates)
-        print("[DBG] buildDevices result: \(devices.map { "\($0.ip) verified=\($0.verified) kind=\($0.kind)" })")
         let orderedDevices = orderDevices(devices, preferredIP: preferredIP)
 
         discoveredDevices = orderedDevices
@@ -314,7 +310,7 @@ class TVController: ObservableObject {
         return try await session.data(for: req)
     }
 
-    private func parseTag(_ tag: String, from xml: String) -> String? {
+    nonisolated private func parseTag(_ tag: String, from xml: String) -> String? {
         guard let start = xml.range(of: "<\(tag)>"),
               let end   = xml.range(of: "</\(tag)>") else { return nil }
         let value = String(xml[start.upperBound..<end.lowerBound])
@@ -330,14 +326,12 @@ class TVController: ObservableObject {
         await withTaskGroup(of: TVDevice?.self) { group in
             for candidate in candidates {
                 group.addTask { [weak self] in
-                    guard let self else { print("[DBG] self nil for \(candidate.ip)"); return nil }
-                    print("[DBG] verifyLGTV 시작: \(candidate.ip)")
+                    guard let self else { return nil }
                     let (reachable, verified, label, kind) = await self.verifyLGTV(
                         ip: candidate.ip,
                         location: candidate.location,
                         server: candidate.server
                     )
-                    print("[DBG] verifyLGTV 완료: \(candidate.ip) reachable=\(reachable) verified=\(verified) kind=\(kind)")
                     guard reachable else { return nil }
 
                     let displayName: String
@@ -395,7 +389,7 @@ class TVController: ObservableObject {
     }
 
     /// 포트 8080이 열려있으면 후보에 유지하고, LG TV / 프린터 / 기타를 판별한다.
-    private func verifyLGTV(ip: String, location: String, server: String) async -> (reachable: Bool, verified: Bool, label: String, kind: DeviceKind) {
+    nonisolated private func verifyLGTV(ip: String, location: String, server: String) async -> (reachable: Bool, verified: Bool, label: String, kind: DeviceKind) {
         guard await isPortOpen(ip: ip, timeoutMs: 2000) else { return (false, false, "", .unknown) }
 
         let ssdpServerLooksLikeLG = looksLikeLGServer(server)
@@ -472,19 +466,19 @@ class TVController: ObservableObject {
         return (true, false, "", .unknown)
     }
 
-    private func looksLikeLGServer(_ value: String) -> Bool {
+    nonisolated private func looksLikeLGServer(_ value: String) -> Bool {
         let upper = value.uppercased()
         return upper.contains("LG") || upper.contains("NETCAST") || upper.contains("UDAP")
     }
 
-    private func looksLikePrinter(_ value: String) -> Bool {
+    nonisolated private func looksLikePrinter(_ value: String) -> Bool {
         let upper = value.uppercased()
         return upper.contains("HP HTTP") || upper.contains("EPSON") || upper.contains("CANON")
             || upper.contains("BROTHER") || upper.contains("XEROX") || upper.contains("RICOH")
             || upper.contains("LEXMARK") || upper.contains("KYOCERA") || upper.contains("PRINTER")
     }
 
-    private func printerModel(from server: String) -> String {
+    nonisolated private func printerModel(from server: String) -> String {
         // "HP HTTP Server; HP HP OfficeJet Pro 8710 - M9L66A; ..." → "HP OfficeJet Pro 8710"
         let parts = server.components(separatedBy: ";")
         for part in parts {
