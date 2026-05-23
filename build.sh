@@ -111,8 +111,5 @@ else
   echo "⚠️  backup.sh 를 찾을 수 없어 백업을 건너뜁니다."
 fi
 
-# 로컬 네트워크 TCC 권한 초기화 (서명 변경 시 기존 캐시 제거)
-tccutil reset LocalNetwork "$BUNDLE_ID" 2>/dev/null || true
-
 echo "▶  앱 실행"
 open "$APP_DIR"
