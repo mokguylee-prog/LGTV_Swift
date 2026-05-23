@@ -158,11 +158,34 @@ private func gap(_ w: CGFloat) -> some View { Color.clear.frame(width: w) }
 
 struct RemoteView: View {
     @EnvironmentObject var tv: TVController
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(spacing: 0) {
-            ConnectionView().environmentObject(tv)
+            // Compact status bar
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(stateColor)
+                    .frame(width: 7, height: 7)
+                Text(tv.statusMessage)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                Spacer()
+                Button {
+                    openWindow(id: "connection")
+                    NSApp.activate(ignoringOtherApps: true)
+                } label: {
+                    Label("연결 설정", systemImage: "network.badge.shield.half.filled")
+                        .font(.caption)
+                }
+                .controlSize(.small)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+
             Divider()
+
             ScrollView {
                 VStack(spacing: 0) {
                     VStack(spacing: 0) {
@@ -184,6 +207,15 @@ struct RemoteView: View {
         }
         .frame(width: 480)
         .background(Color.appBg)
+    }
+
+    private var stateColor: Color {
+        switch tv.connectionState {
+        case .disconnected: return .gray
+        case .connecting:   return .orange
+        case .connected:    return .green
+        case .error:        return .red
+        }
     }
 
     // ── Inner remote body ──────────────────────────────────────────────────

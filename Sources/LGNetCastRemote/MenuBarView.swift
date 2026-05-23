@@ -4,6 +4,7 @@ import SwiftUI
 struct MenuBarView: View {
     @EnvironmentObject var tv: TVController
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         VStack(spacing: 8) {
@@ -41,8 +42,7 @@ struct MenuBarView: View {
 
             // Action buttons
             Button("리모컨 열기") {
-                openWindow(id: "remote")
-                NSApp.activate(ignoringOtherApps: true)
+                openRemoteWindow()
             }
             .buttonStyle(MenuActionStyle())
 
@@ -83,6 +83,17 @@ struct MenuBarView: View {
         case .connecting:   return .orange
         case .connected:    return .green
         case .error:        return .red
+        }
+    }
+
+    private func openRemoteWindow() {
+        let menuWindow = NSApp.keyWindow
+        openWindow(id: "remote")
+        NSApp.activate(ignoringOtherApps: true)
+        dismiss()
+
+        DispatchQueue.main.async {
+            menuWindow?.close()
         }
     }
 }

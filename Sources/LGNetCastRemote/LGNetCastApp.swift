@@ -7,10 +7,16 @@ struct LGNetCastApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var tv = TVController()
 
+    private var appVersion: String {
+        let ver  = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2"
+        let date = Bundle.main.infoDictionary?["CFBundleBuildDate"] as? String ?? "2026.05.23"
+        return "v\(ver)  (\(date))"
+    }
+
     var body: some Scene {
 
         // ── Full remote window ─────────────────────────────────────────────
-        Window("LG NetCast 리모컨", id: "remote") {
+        Window("LG NetCast 리모컨  \(appVersion)", id: "remote") {
             RemoteView()
                 .environmentObject(tv)
         }
@@ -19,6 +25,14 @@ struct LGNetCastApp: App {
         .commands {
             CommandGroup(replacing: .newItem) { }
         }
+
+        // ── Connection setup window ────────────────────────────────────────
+        Window("TV 연결 설정", id: "connection") {
+            ConnectionWindowView()
+                .environmentObject(tv)
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.topTrailing)
 
         // ── Menu-bar extra ─────────────────────────────────────────────────
         MenuBarExtra {

@@ -14,11 +14,14 @@ struct TVState: Codable {
     }
 }
 
+enum DeviceKind: Equatable { case lgTV, printer, unknown }
+
 struct TVDevice: Identifiable {
     let id = UUID()
     let ip: String
     let name: String
     let verified: Bool
+    var kind: DeviceKind = .unknown
 }
 
 enum ConnectionState: Equatable {

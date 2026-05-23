@@ -13,8 +13,16 @@ class TVController: ObservableObject {
     @Published var pin: String = "SMKBWA"
     @Published var connectionState: ConnectionState = .disconnected
     @Published var discoveredDevices: [TVDevice] = []
-    @Published var isScanning: Bool = false
+    @Published var isScanning: Bool    = false
     @Published var statusMessage: String = "연결 안됨"
+
+    // 검색 진행 상황
+    @Published var ssdpDone    = false
+    @Published var portScanned = 0
+    @Published var portTotal   = 0
+    @Published var portLog: [(ip: String, open: Bool)] = []
+    @Published var verifyDone  = 0
+    @Published var verifyTotal = 0
 
     // MARK: - Private
 
@@ -161,7 +169,7 @@ class TVController: ObservableObject {
             let (data, response) = try await post(url: url, body: xml)
             if let http = response as? HTTPURLResponse, http.statusCode == 200,
                let text = String(data: data, encoding: .utf8),
-               let sessionID = parseTag("session", from: text) {
+               let sessionID = parseTag("session", from: text) ?? parseTag("value", from: text) {
                 connectionState = .connected(session: sessionID)
                 statusMessage = "연결됨 ✓"
                 saveState()
@@ -215,25 +223,53 @@ class TVController: ObservableObject {
     // MARK: - Device Discovery
 
     func discover() async {
-        isScanning = true
+        isScanning  = true
+        ssdpDone    = false
+        portScanned = 0
+        portTotal   = 0
+        portLog     = []
+        verifyDone  = 0
+        verifyTotal = 0
         discoveredDevices = []
         statusMessage = "네트워크 검색 중..."
 
         let ssdp = SSDPDiscovery()
         let preferredIP = tvIP
-        var candidates = await ssdp.discover(includePortScan: false)
-        candidates = mergePreferredCandidate(preferredIP, into: candidates)
 
-        var devices = await buildDevices(from: candidates)
-        var orderedDevices = orderDevices(devices, preferredIP: preferredIP)
-
-        if orderedDevices.isEmpty {
-            statusMessage = "SSDP 응답 없음 - 로컬 네트워크 스캔 중..."
-            candidates = await ssdp.discover(includePortScan: true)
-            candidates = mergePreferredCandidate(preferredIP, into: candidates)
-            devices = await buildDevices(from: candidates)
-            orderedDevices = orderDevices(devices, preferredIP: preferredIP)
+        // 1.1 방식: SSDP/B-SEARCH와 포트 스캔을 동시에 돌려 모든 후보를 수집
+        async let ssdpCandidates = ssdp.discover(includePortScan: false)
+        async let scanCandidates = ssdp.portScanOnly { [weak self] done, total, ip, open in
+            guard open else {
+                // 닫힌 포트는 카운터만 업데이트 (main actor 부하 최소화)
+                if done % 10 == 0 || done == total {
+                    Task { @MainActor [weak self] in
+                        self?.portScanned = done
+                        self?.portTotal   = total
+                    }
+                }
+                return
+            }
+            Task { @MainActor [weak self] in
+                self?.portScanned = done
+                self?.portTotal   = total
+                self?.portLog.append((ip: ip, open: open))
+            }
         }
+
+        var seen: [String: SSDPCandidate] = [:]
+        for c in await ssdpCandidates { seen[c.ip] = seen[c.ip] ?? c }
+        ssdpDone = true
+        print("[DBG] SSDP candidates: \(seen.keys.sorted())")
+        for c in await scanCandidates { seen[c.ip] = seen[c.ip] ?? c }
+        print("[DBG] After port scan, total candidates: \(seen.count), IPs: \(seen.keys.sorted())")
+
+        var candidates = Array(seen.values)
+        candidates = mergePreferredCandidate(preferredIP, into: candidates)
+        print("[DBG] After merge (preferredIP=\(preferredIP)): \(candidates.map(\.ip))")
+
+        let devices = await buildDevices(from: candidates)
+        print("[DBG] buildDevices result: \(devices.map { "\($0.ip) verified=\($0.verified) kind=\($0.kind)" })")
+        let orderedDevices = orderDevices(devices, preferredIP: preferredIP)
 
         discoveredDevices = orderedDevices
         isScanning = false
@@ -242,18 +278,16 @@ class TVController: ObservableObject {
             statusMessage = "기기를 찾지 못했습니다"
             return
         }
-        if let bestCandidate = orderedDevices.first(where: { $0.verified }) ?? orderedDevices.first {
-            if bestCandidate.verified {
-                statusMessage = "LG TV 찾음: \(bestCandidate.ip)"
-            } else {
-                statusMessage = "접속 가능한 후보 기기 \(orderedDevices.count)개 발견"
-            }
+
+        let verifiedCount = orderedDevices.filter { $0.verified }.count
+        if let selectedTV = orderedDevices.first(where: { $0.ip == tvIP && $0.kind == .lgTV }) {
+            statusMessage = "기기 \(orderedDevices.count)개 발견 (LG TV \(verifiedCount)개) - \(selectedTV.ip) 선택됨"
         } else {
-            statusMessage = "\(orderedDevices.count)개 기기 발견"
+            statusMessage = "기기 \(orderedDevices.count)개 발견 (LG TV \(verifiedCount)개)"
         }
 
-        // LG TV 확인되면 저장 후 자동 연결
-        if let first = discoveredDevices.first(where: { $0.verified }), !pin.isEmpty {
+        // 1.1 동작 복구: LG TV 확인되면 저장 후 자동 연결
+        if let first = discoveredDevices.first(where: { $0.verified && $0.kind == .lgTV }), !pin.isEmpty {
             tvIP = first.ip
             saveState()
             await connect()
@@ -290,33 +324,39 @@ class TVController: ObservableObject {
 
     private func buildDevices(from candidates: [SSDPCandidate]) async -> [TVDevice] {
         var devices: [TVDevice] = []
+        verifyTotal = candidates.count
+        verifyDone  = 0
 
         await withTaskGroup(of: TVDevice?.self) { group in
             for candidate in candidates {
                 group.addTask { [weak self] in
-                    guard let self else { return nil }
-                    let (reachable, verified, label) = await self.verifyLGTV(
+                    guard let self else { print("[DBG] self nil for \(candidate.ip)"); return nil }
+                    print("[DBG] verifyLGTV 시작: \(candidate.ip)")
+                    let (reachable, verified, label, kind) = await self.verifyLGTV(
                         ip: candidate.ip,
                         location: candidate.location,
                         server: candidate.server
                     )
+                    print("[DBG] verifyLGTV 완료: \(candidate.ip) reachable=\(reachable) verified=\(verified) kind=\(kind)")
                     guard reachable else { return nil }
 
                     let displayName: String
-                    if verified {
+                    switch kind {
+                    case .lgTV:
                         let suffix = label.isEmpty ? "" : "  \(label)"
                         displayName = "\(candidate.ip)  [LG TV 확인]\(suffix)"
-                    } else {
+                    case .printer:
+                        displayName = "\(candidate.ip)  \(label)"
+                    case .unknown:
                         displayName = "\(candidate.ip)  [후보 기기]"
                     }
-                    return TVDevice(ip: candidate.ip, name: displayName, verified: verified)
+                    return TVDevice(ip: candidate.ip, name: displayName, verified: verified, kind: kind)
                 }
             }
 
             for await device in group {
-                if let device {
-                    devices.append(device)
-                }
+                verifyDone += 1
+                if let device { devices.append(device) }
             }
         }
 
@@ -354,14 +394,13 @@ class TVController: ObservableObject {
         return candidates + [SSDPCandidate(ip: preferredIP, location: "", server: "")]
     }
 
-    /// 포트 8080이 열려있으면 후보에 유지하고, LG TV 여부를 추가로 검증한다.
-    private func verifyLGTV(ip: String, location: String, server: String) async -> (reachable: Bool, verified: Bool, label: String) {
-        // 1. port 8080 연결 가능 여부 확인 (2초 타임아웃)
-        guard await isPortOpen(ip: ip, timeoutMs: 2000) else { return (false, false, "") }
+    /// 포트 8080이 열려있으면 후보에 유지하고, LG TV / 프린터 / 기타를 판별한다.
+    private func verifyLGTV(ip: String, location: String, server: String) async -> (reachable: Bool, verified: Bool, label: String, kind: DeviceKind) {
+        guard await isPortOpen(ip: ip, timeoutMs: 2000) else { return (false, false, "", .unknown) }
 
         let ssdpServerLooksLikeLG = looksLikeLGServer(server)
 
-        // 2. SSDP LOCATION URL → UPnP 기기 설명 XML 파싱
+        // 1. SSDP LOCATION URL → UPnP 기기 설명 XML 파싱
         if !location.isEmpty, let url = URL(string: location) {
             var req = URLRequest(url: url, timeoutInterval: 3)
             req.setValue("UDAP/2.0", forHTTPHeaderField: "User-Agent")
@@ -383,49 +422,78 @@ class TVController: ObservableObject {
 
                 if (mfrOK && tvHint) || srvHasLG {
                     let label = [friendly, modelName].filter { !$0.isEmpty }.joined(separator: " / ")
-                    return (true, true, label)
+                    return (true, true, label, .lgTV)
                 }
             }
         }
 
-        // 3. 루트 페이지 응답 헤더와 텍스트 확인
+        // 2. 루트 페이지 응답 헤더 + 본문 확인 — 프린터/LG 감지
         if let url = URL(string: "http://\(ip):\(kPort)/") {
             var req = URLRequest(url: url, timeoutInterval: 2)
             req.setValue("iPhone", forHTTPHeaderField: "User-Agent")
             if let (data, response) = try? await session.data(for: req) {
-                let responseServer = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Server") ?? ""
-                if looksLikeLGServer(responseServer) {
-                    return (true, true, "")
+                let http = response as? HTTPURLResponse
+                let responseServer = http?.value(forHTTPHeaderField: "Server") ?? ""
+
+                if looksLikePrinter(responseServer) {
+                    return (true, false, "프린터: \(printerModel(from: responseServer))", .printer)
                 }
 
+                if looksLikeLGServer(responseServer) {
+                    return (true, true, "", .lgTV)
+                }
+
+                // 본문에 HDCP / LG 관련 키워드 (LG NetCast 고유 응답)
                 let text = (String(data: data, encoding: .utf8) ?? "").uppercased()
-                if text.contains("LG") || text.contains("NETCAST") || text.contains("UDAP") {
-                    return (true, true, "")
+                if text.contains("HDCP") || text.contains("NETCAST") || text.contains("UDAP") {
+                    return (true, true, "LG NetCast", .lgTV)
+                }
+                if text.contains("LG") {
+                    return (true, true, "", .lgTV)
                 }
             }
         }
 
         if ssdpServerLooksLikeLG {
-            return (true, true, "")
+            return (true, true, "", .lgTV)
         }
 
-        // 4. HDCP API 엔드포인트 응답 확인 (LG NetCast 전용)
+        // 3. HDCP API 엔드포인트 응답 확인 (LG NetCast 전용)
         if let url = URL(string: "http://\(ip):\(kPort)/hdcp/api") {
             var req = URLRequest(url: url, timeoutInterval: 2)
             req.setValue("iPhone", forHTTPHeaderField: "User-Agent")
             if let (_, resp) = try? await session.data(for: req),
                let http = resp as? HTTPURLResponse, http.statusCode < 500 {
-                return (true, true, "LG NetCast")
+                return (true, true, "LG NetCast", .lgTV)
             }
         }
 
-        // 5. 포트는 열려있지만 확인이 덜 된 경우도 후보로 유지
-        return (true, false, "")
+        // 4. 포트는 열려있지만 확인이 덜 된 경우도 후보로 유지
+        return (true, false, "", .unknown)
     }
 
     private func looksLikeLGServer(_ value: String) -> Bool {
         let upper = value.uppercased()
         return upper.contains("LG") || upper.contains("NETCAST") || upper.contains("UDAP")
+    }
+
+    private func looksLikePrinter(_ value: String) -> Bool {
+        let upper = value.uppercased()
+        return upper.contains("HP HTTP") || upper.contains("EPSON") || upper.contains("CANON")
+            || upper.contains("BROTHER") || upper.contains("XEROX") || upper.contains("RICOH")
+            || upper.contains("LEXMARK") || upper.contains("KYOCERA") || upper.contains("PRINTER")
+    }
+
+    private func printerModel(from server: String) -> String {
+        // "HP HTTP Server; HP HP OfficeJet Pro 8710 - M9L66A; ..." → "HP OfficeJet Pro 8710"
+        let parts = server.components(separatedBy: ";")
+        for part in parts {
+            let trimmed = part.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("HP "), trimmed.count < 60 {
+                return String(trimmed.prefix(50))
+            }
+        }
+        return server.components(separatedBy: ";").first?.trimmingCharacters(in: .whitespaces) ?? server
     }
 
     private func setError(_ msg: String) {

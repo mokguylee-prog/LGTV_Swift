@@ -48,6 +48,10 @@ actor SSDPDiscovery {
         return found.values.sorted { $0.ip.localizedStandardCompare($1.ip) == .orderedAscending }
     }
 
+    func portScanOnly(onProgress: (@Sendable (Int, Int, String, Bool) -> Void)? = nil) async -> [SSDPCandidate] {
+        await portScan(onProgress: onProgress)
+    }
+
     // MARK: - SSDP M-SEARCH (UDP multicast 239.255.255.250:1900)
 
     private func mSearch() async -> [SSDPCandidate] {
@@ -143,7 +147,7 @@ actor SSDPDiscovery {
 
     // MARK: - Port scan fallback
 
-    private func portScan() async -> [SSDPCandidate] {
+    func portScan(onProgress: (@Sendable (Int, Int, String, Bool) -> Void)? = nil) async -> [SSDPCandidate] {
         let subnets = localSubnets()
         guard !subnets.isEmpty else { return [] }
 
@@ -154,8 +158,9 @@ actor SSDPDiscovery {
                 return seen.insert(ip).inserted ? ip : nil
             }
         }
+        let total = ips.count
 
-        return await withTaskGroup(of: SSDPCandidate?.self) { group in
+        return await withTaskGroup(of: (SSDPCandidate?, String).self) { group in
             var iterator = ips.makeIterator()
             let initialCount = min(Self.portScanConcurrency, ips.count)
             for _ in 0..<initialCount {
@@ -164,11 +169,11 @@ actor SSDPDiscovery {
             }
 
             var found: [SSDPCandidate] = []
-            while let candidate = await group.next() {
-                if let candidate {
-                    found.append(candidate)
-                }
-
+            var done = 0
+            while let (candidate, ip) = await group.next() {
+                done += 1
+                onProgress?(done, total, ip, candidate != nil)
+                if let candidate { found.append(candidate) }
                 if let nextIP = iterator.next() {
                     addPortScanTask(ip: nextIP, to: &group)
                 }
@@ -238,7 +243,7 @@ actor SSDPDiscovery {
         }
     }
 
-    private func checkPort(ip: String, port: Int32) async -> Bool {
+    nonisolated private func checkPort(ip: String, port: Int32) async -> Bool {
         let sock = socket(AF_INET, SOCK_STREAM, 0)
         guard sock >= 0 else { return false }
         defer { close(sock) }
@@ -276,12 +281,11 @@ actor SSDPDiscovery {
 
     private func addPortScanTask(
         ip: String,
-        to group: inout TaskGroup<SSDPCandidate?>
+        to group: inout TaskGroup<(SSDPCandidate?, String)>
     ) {
         group.addTask { [self] in
-            await self.checkPort(ip: ip, port: Self.tvPort)
-                ? SSDPCandidate(ip: ip, location: "", server: "")
-                : nil
+            let open = await self.checkPort(ip: ip, port: Self.tvPort)
+            return (open ? SSDPCandidate(ip: ip, location: "", server: "") : nil, ip)
         }
     }
 
@@ -335,7 +339,7 @@ actor SSDPDiscovery {
     }
 
     // fd_set helpers (macOS-specific)
-    private func fdSet(_ fd: Int32, set: inout fd_set) {
+    nonisolated private func fdSet(_ fd: Int32, set: inout fd_set) {
         let intOffset = Int(fd) / 32
         let bitOffset = Int(fd) % 32
         withUnsafeMutableBytes(of: &set) { ptr in

@@ -14,6 +14,8 @@ PROJECT_NAME="$(grep -m1 'name:' Package.swift | sed 's/.*name:[[:space:]]*"\(.*
 
 # 빌드 설정 (기본: release)
 CONFIG="${1:-release}"
+APP_VERSION="1.2"
+BUILD_DATE="$(date +%Y.%m.%d)"
 
 if [[ "$CONFIG" != "debug" && "$CONFIG" != "release" ]]; then
   echo "사용법: $0 [debug|release]" >&2
@@ -62,9 +64,25 @@ cat > "$CONTENTS/Info.plist" << PLIST
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleVersion</key>
-    <string>1.0</string>
+    <string>${APP_VERSION}</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
+    <string>${APP_VERSION}</string>
+    <key>CFBundleBuildDate</key>
+    <string>${BUILD_DATE}</string>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
+    </dict>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>LG NetCast TV를 검색하고 리모컨 명령을 보내기 위해 로컬 네트워크에 접근합니다.</string>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_http._tcp</string>
+        <string>_services._dns-sd._udp</string>
+    </array>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
     <key>NSHighResolutionCapable</key>
@@ -75,7 +93,10 @@ cat > "$CONTENTS/Info.plist" << PLIST
 </plist>
 PLIST
 
-# 4. 프로젝트 루트에도 단독 바이너리 복사 (기존 동작 유지)
+# 4. ad-hoc 코드 서명 (로컬 네트워크 TCC 권한 획득에 필요)
+codesign --force --deep --sign - "$APP_DIR"
+
+# 5. 프로젝트 루트에도 단독 바이너리 복사 (기존 동작 유지)
 cp "$BINARY_PATH" "$SCRIPT_DIR/$PROJECT_NAME"
 
 echo "✓  앱 번들: $APP_DIR"
@@ -89,3 +110,9 @@ elif [[ -f "$BACKUP_SCRIPT" ]]; then
 else
   echo "⚠️  backup.sh 를 찾을 수 없어 백업을 건너뜁니다."
 fi
+
+# 로컬 네트워크 TCC 권한 초기화 (서명 변경 시 기존 캐시 제거)
+tccutil reset LocalNetwork "$BUNDLE_ID" 2>/dev/null || true
+
+echo "▶  앱 실행"
+open "$APP_DIR"

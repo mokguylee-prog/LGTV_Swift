@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Plex authorisation issues - Configuration - Home Assistant Community</title>
+    <meta name="description" content="I’m trying to set up the plex server component but I keep getting this: 
+plexapi: http://192.168.0.26:32400: (401) unauthorized 
+I’ve put the token into the configurator, and it’s created a plex.conf, but it still doesn’&amp;hellip;">
+    <meta name="generator" content="Discourse 2026.1.3 - https://github.com/discourse/discourse version b3f024ce9587e678216892cbd967201b2450e197">
+<link rel="icon" type="image/png" href="https://community-assets.home-assistant.io/optimized/4X/0/a/2/0a20e9d372791856e50ccb2ed7e95d7a33d515e6_2_32x32.png">
+<link rel="apple-touch-icon" type="image/png" href="https://community-assets.home-assistant.io/optimized/4X/0/d/8/0d8fd51f25f77c512074ace8b2a1c25c49900c97_2_180x180.png">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#03a9f4">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#03a9f4">
+
+<meta name="color-scheme" content="light dark">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, viewport-fit=cover">
+<link rel="canonical" href="https://community.home-assistant.io/t/plex-authorisation-issues/8929" />
+
+
+<link rel="search" type="application/opensearchdescription+xml" href="https://community.home-assistant.io/opensearch.xml" title="Home Assistant Community Search">
+
+    
+    <link href="/stylesheets/color_definitions_home-assistant_1_2_ba716a3f52cd919c71e13df3d1dac99aae1920db.css?__ws=community.home-assistant.io" media="(prefers-color-scheme: light)" rel="stylesheet" class="light-scheme" data-scheme-id="1"/><link href="/stylesheets/color_definitions_home-assistant-dark_8_2_7497dab3cb869a99cab5674ef102008f11375919.css?__ws=community.home-assistant.io" media="(prefers-color-scheme: dark)" rel="stylesheet" class="dark-scheme" data-scheme-id="8"/>
+
+<link href="/stylesheets/common_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="common"  />
+
+  <link href="/stylesheets/mobile_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="(max-width: 39.99999rem)" rel="stylesheet" data-target="mobile"  />
+  <link href="/stylesheets/desktop_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="(min-width: 40rem)" rel="stylesheet" data-target="desktop"  />
+
+
+
+    <link href="/stylesheets/automation_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="automation"  />
+    <link href="/stylesheets/chat_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="chat"  />
+    <link href="/stylesheets/checklist_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="checklist"  />
+    <link href="/stylesheets/discourse-cakeday_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="discourse-cakeday"  />
+    <link href="/stylesheets/discourse-data-explorer_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="discourse-data-explorer"  />
+    <link href="/stylesheets/discourse-details_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="discourse-details"  />
+    <link href="/stylesheets/discourse-github_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="discourse-github"  />
+    <link href="/stylesheets/discourse-lazy-videos_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="discourse-lazy-videos"  />
+    <link href="/stylesheets/discourse-local-dates_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="discourse-local-dates"  />
+    <link href="/stylesheets/discourse-narrative-bot_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="discourse-narrative-bot"  />
+    <link href="/stylesheets/discourse-presence_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="discourse-presence"  />
+    <link href="/stylesheets/discourse-reactions_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="discourse-reactions"  />
+    <link href="/stylesheets/discourse-saved-searches_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="discourse-saved-searches"  />
+    <link href="/stylesheets/discourse-signatures_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="discourse-signatures"  />
+    <link href="/stylesheets/discourse-solved_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="discourse-solved"  />
+    <link href="/stylesheets/discourse-templates_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="discourse-templates"  />
+    <link href="/stylesheets/discourse-tooltips_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="discourse-tooltips"  />
+    <link href="/stylesheets/discourse-topic-voting_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="discourse-topic-voting"  />
+    <link href="/stylesheets/docker_manager_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="docker_manager"  />
+    <link href="/stylesheets/footnote_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="footnote"  />
+    <link href="/stylesheets/poll_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="poll"  />
+    <link href="/stylesheets/spoiler-alert_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="spoiler-alert"  />
+    <link href="/stylesheets/chat_mobile_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="(max-width: 39.99999rem)" rel="stylesheet" data-target="chat_mobile"  />
+    <link href="/stylesheets/discourse-reactions_mobile_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="(max-width: 39.99999rem)" rel="stylesheet" data-target="discourse-reactions_mobile"  />
+    <link href="/stylesheets/discourse-solved_mobile_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="(max-width: 39.99999rem)" rel="stylesheet" data-target="discourse-solved_mobile"  />
+    <link href="/stylesheets/discourse-topic-voting_mobile_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="(max-width: 39.99999rem)" rel="stylesheet" data-target="discourse-topic-voting_mobile"  />
+    <link href="/stylesheets/chat_desktop_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="(min-width: 40rem)" rel="stylesheet" data-target="chat_desktop"  />
+    <link href="/stylesheets/discourse-reactions_desktop_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="(min-width: 40rem)" rel="stylesheet" data-target="discourse-reactions_desktop"  />
+    <link href="/stylesheets/discourse-topic-voting_desktop_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="(min-width: 40rem)" rel="stylesheet" data-target="discourse-topic-voting_desktop"  />
+    <link href="/stylesheets/poll_desktop_25a2e3508bead5607971fafa0d1b10f700de1cd3.css?__ws=community.home-assistant.io" media="(min-width: 40rem)" rel="stylesheet" data-target="poll_desktop"  />
+
+  <link href="/stylesheets/common_theme_14_00074a3ec2f84191d9003be0a3cf483d3f08a504.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="common_theme" data-theme-id="14" data-theme-name="category banners"/>
+<link href="/stylesheets/common_theme_28_62bdb80bd9ea8a4a0582359eb9491153a5be9036.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="common_theme" data-theme-id="28" data-theme-name="composer code button move to insertions"/>
+<link href="/stylesheets/common_theme_19_48be51e869ea7ce2f6177172ee38c54d1dc45bee.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="common_theme" data-theme-id="19" data-theme-name="scroll to top"/>
+<link href="/stylesheets/common_theme_15_85642150c374488de072879eb432b9945702316c.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="common_theme" data-theme-id="15" data-theme-name="social share"/>
+<link href="/stylesheets/common_theme_27_fb9997e6b4c91f1ec4e789ef75cb0075c6fbc2a7.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="common_theme" data-theme-id="27" data-theme-name="unformatted code detector"/>
+<link href="/stylesheets/common_theme_11_354b4d51228c27bfbc217a40ba2c19e50297214f.css?__ws=community.home-assistant.io" media="all" rel="stylesheet" data-target="common_theme" data-theme-id="11" data-theme-name="global css"/>
+    <link href="/stylesheets/mobile_theme_19_6aabf1bf342cb92265cdebb496a08898b25f140a.css?__ws=community.home-assistant.io" media="(max-width: 39.99999rem)" rel="stylesheet" data-target="mobile_theme" data-theme-id="19" data-theme-name="scroll to top"/>
+    <link href="/stylesheets/desktop_theme_19_96f5c55199633d0012cea1f5048624863fdc95cd.css?__ws=community.home-assistant.io" media="(min-width: 40rem)" rel="stylesheet" data-target="desktop_theme" data-theme-id="19" data-theme-name="scroll to top"/>
+
+    
+    
+        <link rel="alternate nofollow" type="application/rss+xml" title="RSS feed of &#39;Plex authorisation issues&#39;" href="https://community.home-assistant.io/t/plex-authorisation-issues/8929.rss" />
+    <meta property="og:site_name" content="Home Assistant Community" />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:image" content="https://community-assets.home-assistant.io/original/4X/5/0/e/50e585faea85010ebb16d3d466f071ef90ec1393.png" />
+<meta property="og:image" content="https://community-assets.home-assistant.io/original/4X/5/0/e/50e585faea85010ebb16d3d466f071ef90ec1393.png" />
+<meta property="og:url" content="https://community.home-assistant.io/t/plex-authorisation-issues/8929" />
+<meta name="twitter:url" content="https://community.home-assistant.io/t/plex-authorisation-issues/8929" />
+<meta property="og:title" content="Plex authorisation issues" />
+<meta name="twitter:title" content="Plex authorisation issues" />
+<meta property="og:description" content="I’m trying to set up the plex server component but I keep getting this:  plexapi: http://192.168.0.26:32400: (401) unauthorized  I’ve put the token into the configurator, and it’s created a plex.conf, but it still doesn’t seem to work.  Any ideas?" />
+<meta name="twitter:description" content="I’m trying to set up the plex server component but I keep getting this:  plexapi: http://192.168.0.26:32400: (401) unauthorized  I’ve put the token into the configurator, and it’s created a plex.conf, but it still doesn’t seem to work.  Any ideas?" />
+<meta property="og:article:section" content="Configuration" />
+<meta property="og:article:section:color" content="3AB54A" />
+<meta property="article:published_time" content="2017-01-04T17:39:32+00:00" />
+<meta property="og:ignore_canonical" content="true" />
+
+
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"QAPage","name":"Plex authorisation issues","mainEntity":{"@type":"Question","name":"Plex authorisation issues","text":"I’m trying to set up the plex server component but I keep getting this:\n\nplexapi: <a href=\"http://192.168.0.26:32400\" rel=\"nofollow noopener\">http://192.168.0.26:32400<\/a>: (401) unauthorized\n\nI’ve put the token into the configurator, and it’s created a plex.conf, but it still doesn’t seem to work.\n\nAny ideas?","upvoteCount":0,"answerCount":0,"datePublished":"2017-01-04T17:39:32.726Z","author":{"@type":"Person","name":"Soul","url":"https://community.home-assistant.io/u/Soul"}}}</script>
+  </head>
+  <body class="crawler ">
+    
+    <header>
+  <a href="/">Home Assistant Community</a>
+</header>
+
+    <div id="main-outlet" class="wrap" role="main">
+        <div id="topic-title">
+    <h1>
+      <a href="/t/plex-authorisation-issues/8929">Plex authorisation issues</a>
+    </h1>
+
+      <div class="topic-category" itemscope itemtype="http://schema.org/BreadcrumbList">
+          <span itemprop="itemListElement" itemscope itemtype="http://schema.org/ListItem">
+            <a href="/c/configuration/11" class="badge-wrapper bullet" itemprop="item">
+              <span class='badge-category-bg' style='background-color: #3AB54A'></span>
+              <span class='badge-category clear-badge'>
+                <span class='category-name' itemprop='name'>Configuration</span>
+              </span>
+            </a>
+            <meta itemprop="position" content="1" />
+          </span>
+      </div>
+
+  </div>
+
+  
+
+    <div itemscope itemtype='http://schema.org/DiscussionForumPosting'>
+      <meta itemprop='headline' content='Plex authorisation issues'>
+      <link itemprop='url' href='https://community.home-assistant.io/t/plex-authorisation-issues/8929'>
+      <meta itemprop='datePublished' content='2017-01-04T17:39:32Z'>
+        <meta itemprop='articleSection' content='Configuration'>
+      <meta itemprop='keywords' content=''>
+      <div itemprop='publisher' itemscope itemtype="http://schema.org/Organization">
+        <meta itemprop='name' content='Home Assistant'>
+          <div itemprop='logo' itemscope itemtype="http://schema.org/ImageObject">
+            <meta itemprop='url' content='https://community-assets.home-assistant.io/original/4X/c/6/b/c6b150b91322bbf7137c5124594bff3f5de0a3e4.png'>
+          </div>
+      </div>
+
+
+          <div id='post_1'  class='topic-body crawler-post'>
+            <div class='crawler-post-meta'>
+              <span class="creator" itemprop="author" itemscope itemtype="http://schema.org/Person">
+                <a itemprop="url" rel='nofollow' href='https://community.home-assistant.io/u/Soul'><span itemprop='name'>Soul</span></a>
+                
+              </span>
+
+                <link itemprop="mainEntityOfPage" href="https://community.home-assistant.io/t/plex-authorisation-issues/8929">
+
+
+              <span class="crawler-post-infos">
+                  <time  datetime='2017-01-04T17:39:32Z' class='post-time'>
+                    January 4, 2017,  5:39pm
+                  </time>
+                  <meta itemprop='dateModified' content='2017-01-04T17:39:32Z'>
+              <span itemprop='position'>1</span>
+              </span>
+            </div>
+            <div class='post' itemprop='text'>
+              <p>I’m trying to set up the plex server component but I keep getting this:</p>
+<p>plexapi: <a href="http://192.168.0.26:32400" rel="nofollow noopener">http://192.168.0.26:32400</a>: (401) unauthorized</p>
+<p>I’ve put the token into the configurator, and it’s created a plex.conf, but it still doesn’t seem to work.</p>
+<p>Any ideas?</p>
+            </div>
+
+            <div itemprop="interactionStatistic" itemscope itemtype="http://schema.org/InteractionCounter">
+              <meta itemprop="interactionType" content="http://schema.org/LikeAction"/>
+              <meta itemprop="userInteractionCount" content="0" />
+              <span class='post-likes'></span>
+            </div>
+
+
+            
+          </div>
+          <div id='post_2' itemprop='comment' itemscope itemtype='http://schema.org/Comment' class='topic-body crawler-post'>
+            <div class='crawler-post-meta'>
+              <span class="creator" itemprop="author" itemscope itemtype="http://schema.org/Person">
+                <a itemprop="url" rel='nofollow' href='https://community.home-assistant.io/u/rpitera'><span itemprop='name'>rpitera</span></a>
+                (Robert Pitera)
+              </span>
+
+
+
+              <span class="crawler-post-infos">
+                  <time itemprop='datePublished' datetime='2017-01-05T16:13:18Z' class='post-time'>
+                    January 5, 2017,  4:13pm
+                  </time>
+                  <meta itemprop='dateModified' content='2017-01-05T16:13:18Z'>
+              <span itemprop='position'>2</span>
+              </span>
+            </div>
+            <div class='post' itemprop='text'>
+              <p>You could also try adding your HA’s IP in the settings in Plex.  Under the server in the network options look for “List of IP addresses and networks that are allowed without auth”.   You may have to show the advanced settings.</p>
+<p>Also just make sure that token hasn’t changed for some reason.</p>
+            </div>
+
+            <div itemprop="interactionStatistic" itemscope itemtype="http://schema.org/InteractionCounter">
+              <meta itemprop="interactionType" content="http://schema.org/LikeAction"/>
+              <meta itemprop="userInteractionCount" content="0" />
+              <span class='post-likes'></span>
+            </div>
+
+
+            
+          </div>
+          <div id='post_3' itemprop='comment' itemscope itemtype='http://schema.org/Comment' class='topic-body crawler-post'>
+            <div class='crawler-post-meta'>
+              <span class="creator" itemprop="author" itemscope itemtype="http://schema.org/Person">
+                <a itemprop="url" rel='nofollow' href='https://community.home-assistant.io/u/Soul'><span itemprop='name'>Soul</span></a>
+                
+              </span>
+
+
+
+              <span class="crawler-post-infos">
+                  <time itemprop='datePublished' datetime='2017-01-07T13:59:04Z' class='post-time'>
+                    January 7, 2017,  1:59pm
+                  </time>
+                  <meta itemprop='dateModified' content='2017-01-07T13:59:04Z'>
+              <span itemprop='position'>3</span>
+              </span>
+            </div>
+            <div class='post' itemprop='text'>
+              <p>Tried that but didn’t seem to make a difference. Unless you need to restart Plex for that setting to take effect?</p>
+<p>Token is still correct.</p>
+            </div>
+
+            <div itemprop="interactionStatistic" itemscope itemtype="http://schema.org/InteractionCounter">
+              <meta itemprop="interactionType" content="http://schema.org/LikeAction"/>
+              <meta itemprop="userInteractionCount" content="0" />
+              <span class='post-likes'></span>
+            </div>
+
+
+            
+          </div>
+          <div id='post_4' itemprop='comment' itemscope itemtype='http://schema.org/Comment' class='topic-body crawler-post'>
+            <div class='crawler-post-meta'>
+              <span class="creator" itemprop="author" itemscope itemtype="http://schema.org/Person">
+                <a itemprop="url" rel='nofollow' href='https://community.home-assistant.io/u/rpitera'><span itemprop='name'>rpitera</span></a>
+                (Robert Pitera)
+              </span>
+
+
+
+              <span class="crawler-post-infos">
+                  <time itemprop='datePublished' datetime='2017-01-09T15:40:09Z' class='post-time'>
+                    January 9, 2017,  3:40pm
+                  </time>
+                  <meta itemprop='dateModified' content='2017-01-09T15:40:09Z'>
+              <span itemprop='position'>4</span>
+              </span>
+            </div>
+            <div class='post' itemprop='text'>
+              <p>I don’t remember restarting after I added this.</p>
+            </div>
+
+            <div itemprop="interactionStatistic" itemscope itemtype="http://schema.org/InteractionCounter">
+              <meta itemprop="interactionType" content="http://schema.org/LikeAction"/>
+              <meta itemprop="userInteractionCount" content="0" />
+              <span class='post-likes'></span>
+            </div>
+
+
+            
+          </div>
+          <div id='post_5' itemprop='comment' itemscope itemtype='http://schema.org/Comment' class='topic-body crawler-post'>
+            <div class='crawler-post-meta'>
+              <span class="creator" itemprop="author" itemscope itemtype="http://schema.org/Person">
+                <a itemprop="url" rel='nofollow' href='https://community.home-assistant.io/u/GigabitGuy'><span itemprop='name'>GigabitGuy</span></a>
+                (Michael Pedersen)
+              </span>
+
+
+
+              <span class="crawler-post-infos">
+                  <time itemprop='datePublished' datetime='2017-06-07T20:27:14Z' class='post-time'>
+                    June 7, 2017,  8:27pm
+                  </time>
+                  <meta itemprop='dateModified' content='2017-06-07T20:27:14Z'>
+              <span itemprop='position'>5</span>
+              </span>
+            </div>
+            <div class='post' itemprop='text'>
+              <p>Did you get this to work <a class="mention" href="/u/soul">@Soul</a>? I have the exact same problem, even tried to do a curl command with the token in - got a lot of data back, so et seems to be to be a HA problem perhaps?</p>
+            </div>
+
+            <div itemprop="interactionStatistic" itemscope itemtype="http://schema.org/InteractionCounter">
+              <meta itemprop="interactionType" content="http://schema.org/LikeAction"/>
+              <meta itemprop="userInteractionCount" content="0" />
+              <span class='post-likes'></span>
+            </div>
+
+
+            
+          </div>
+          <div id='post_6' itemprop='comment' itemscope itemtype='http://schema.org/Comment' class='topic-body crawler-post'>
+            <div class='crawler-post-meta'>
+              <span class="creator" itemprop="author" itemscope itemtype="http://schema.org/Person">
+                <a itemprop="url" rel='nofollow' href='https://community.home-assistant.io/u/Soul'><span itemprop='name'>Soul</span></a>
+                
+              </span>
+
+
+
+              <span class="crawler-post-infos">
+                  <time itemprop='datePublished' datetime='2017-06-21T20:43:36Z' class='post-time'>
+                    June 21, 2017,  8:43pm
+                  </time>
+                  <meta itemprop='dateModified' content='2017-06-21T20:43:36Z'>
+              <span itemprop='position'>6</span>
+              </span>
+            </div>
+            <div class='post' itemprop='text'>
+              <p>Yes it seems to be working now. I’ve got a plex.conf file with my token in it and it seems fine.</p>
+            </div>
+
+            <div itemprop="interactionStatistic" itemscope itemtype="http://schema.org/InteractionCounter">
+              <meta itemprop="interactionType" content="http://schema.org/LikeAction"/>
+              <meta itemprop="userInteractionCount" content="0" />
+              <span class='post-likes'></span>
+            </div>
+
+
+            
+          </div>
+    </div>
+
+
+    
+
+
+
+
+    </div>
+    <footer class="container wrap">
+  <nav class='crawler-nav'>
+    <ul>
+      <li itemscope itemtype='http://schema.org/SiteNavigationElement'>
+        <span itemprop='name'>
+          <a href='/' itemprop="url">Home </a>
+        </span>
+      </li>
+      <li itemscope itemtype='http://schema.org/SiteNavigationElement'>
+        <span itemprop='name'>
+          <a href='/categories' itemprop="url">Categories </a>
+        </span>
+      </li>
+      <li itemscope itemtype='http://schema.org/SiteNavigationElement'>
+        <span itemprop='name'>
+          <a href='/guidelines' itemprop="url">Guidelines </a>
+        </span>
+      </li>
+        <li itemscope itemtype='http://schema.org/SiteNavigationElement'>
+          <span itemprop='name'>
+            <a href='https://www.home-assistant.io/tos/' itemprop="url">Terms of Service </a>
+          </span>
+        </li>
+        <li itemscope itemtype='http://schema.org/SiteNavigationElement'>
+          <span itemprop='name'>
+            <a href='https://www.home-assistant.io/privacy/' itemprop="url">Privacy Policy </a>
+          </span>
+        </li>
+    </ul>
+  </nav>
+  <p class='powered-by-link'>Powered by <a href="https://www.discourse.org">Discourse</a>, best viewed with JavaScript enabled</p>
+</footer>
+
+    
+    <script defer="" src="/theme-javascripts/6cd6fb5a700d75e27bdaa67ee158e8de392bc002.js?__ws=community.home-assistant.io" data-theme-id="11" nonce="eT67a6wFUo55X2A2MBupMJjmh"></script>
+<script defer="" src="/theme-javascripts/c56e8cb2b63269279f7086d9c54bedc85b8eba4d.js?__ws=community.home-assistant.io" data-theme-id="19" nonce="eT67a6wFUo55X2A2MBupMJjmh"></script>
+
+<form class="move-up" action="#up">
+<button>
+<svg class="fa d-icon d-icon-chevron-up svg-icon svg-node" aria-hidden="true"><use xlink:href="#chevron-up"></use></svg>
+</button>
+</form>
+  </body>
+  
+</html>
