@@ -8,8 +8,8 @@ struct LGNetCastApp: App {
     @StateObject private var tv = TVController()
 
     private var appVersion: String {
-        let ver  = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.3"
-        let date = Bundle.main.infoDictionary?["CFBundleBuildDate"] as? String ?? "2026.05.23"
+        let ver  = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.6"
+        let date = Bundle.main.infoDictionary?["CFBundleBuildDate"] as? String ?? "2026.05.25"
         return "v\(ver)  (\(date))"
     }
 

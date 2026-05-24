@@ -25,7 +25,7 @@ struct MenuBarView: View {
 
             Divider()
 
-            // Quick controls (only when connected)
+            // 퀵 컨트롤 / 연결 버튼 — 항상 같은 자리
             if tv.connectionState.isConnected {
                 HStack(spacing: 6) {
                     QuickBtn("speaker.slash",  key: .mute,    tv: tv, repeatable: false, tint: .yellow)
@@ -36,22 +36,31 @@ struct MenuBarView: View {
                     QuickBtn("chevron.down", label: "CH", key: .chDown, tv: tv, tint: .blue)
                 }
                 .padding(.horizontal, 8)
-
-                Divider()
+            } else {
+                Button {
+                    Task { await tv.connect() }
+                } label: {
+                    HStack(spacing: 6) {
+                        if case .connecting = tv.connectionState {
+                            ProgressView().controlSize(.small)
+                            Text("연결 중...")
+                        } else {
+                            Image(systemName: "powerplug.fill")
+                            Text("연결")
+                        }
+                    }
+                }
+                .buttonStyle(MenuActionStyle())
+                .disabled(tv.tvIP.isEmpty || tv.pin.isEmpty)
             }
 
-            // Action buttons
+            Divider()
+
+            // 리모컨 열기 — 항상 같은 자리
             Button("리모컨 열기") {
                 openRemoteWindow()
             }
             .buttonStyle(MenuActionStyle())
-
-            if !tv.connectionState.isConnected {
-                Button("연결") {
-                    Task { await tv.connect() }
-                }
-                .buttonStyle(MenuActionStyle())
-            }
 
             Divider()
 
