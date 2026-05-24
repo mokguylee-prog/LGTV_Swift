@@ -154,11 +154,40 @@ private struct CircleBtn: View {
 
 private func gap(_ w: CGFloat) -> some View { Color.clear.frame(width: w) }
 
+private enum RemotePanelMode {
+    case remote
+    case shortcuts
+    case mouse
+}
+
+private struct RemoteModeButton: View {
+    let title: String
+    let systemImage: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.caption2.weight(.semibold))
+                .labelStyle(.titleAndIcon)
+                .lineLimit(1)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 4)
+                .background(isSelected ? Color.accentColor.opacity(0.18) : Color.primary.opacity(0.06))
+                .foregroundColor(isSelected ? .accentColor : .secondary)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: - RemoteView
 
 struct RemoteView: View {
     @EnvironmentObject var tv: TVController
     @Environment(\.openWindow) private var openWindow
+    @State private var selectedMode: RemotePanelMode = .remote
 
     var body: some View {
         VStack(spacing: 0) {
@@ -171,7 +200,8 @@ struct RemoteView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
-                Spacer()
+                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                modeButtons
                 Button {
                     openWindow(id: "connection")
                     NSApp.activate(ignoringOtherApps: true)
@@ -207,6 +237,32 @@ struct RemoteView: View {
         }
         .frame(width: 480)
         .background(Color.appBg)
+    }
+
+    private var modeButtons: some View {
+        HStack(spacing: 4) {
+            RemoteModeButton(
+                title: "리모컨",
+                systemImage: "rectangle.grid.3x2",
+                isSelected: selectedMode == .remote
+            ) {
+                selectedMode = .remote
+            }
+            RemoteModeButton(
+                title: "단축",
+                systemImage: "bolt.fill",
+                isSelected: selectedMode == .shortcuts
+            ) {
+                selectedMode = .shortcuts
+            }
+            RemoteModeButton(
+                title: "마우스",
+                systemImage: "cursorarrow",
+                isSelected: selectedMode == .mouse
+            ) {
+                selectedMode = .mouse
+            }
+        }
     }
 
     private var stateColor: Color {

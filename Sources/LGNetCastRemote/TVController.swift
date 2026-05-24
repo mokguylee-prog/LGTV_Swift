@@ -239,16 +239,6 @@ class TVController: ObservableObject {
         // 1.1 방식: SSDP/B-SEARCH와 포트 스캔을 동시에 돌려 모든 후보를 수집
         async let ssdpCandidates = ssdp.discover(includePortScan: false)
         async let scanCandidates = ssdp.portScanOnly { [weak self] done, total, ip, open in
-            guard open else {
-                // 닫힌 포트는 카운터만 업데이트 (main actor 부하 최소화)
-                if done % 10 == 0 || done == total {
-                    Task { @MainActor [weak self] in
-                        self?.portScanned = done
-                        self?.portTotal   = total
-                    }
-                }
-                return
-            }
             Task { @MainActor [weak self] in
                 self?.portScanned = done
                 self?.portTotal   = total
@@ -282,11 +272,15 @@ class TVController: ObservableObject {
             statusMessage = "기기 \(orderedDevices.count)개 발견 (LG TV \(verifiedCount)개)"
         }
 
-        // 1.1 동작 복구: LG TV 확인되면 저장 후 자동 연결
-        if let first = discoveredDevices.first(where: { $0.verified && $0.kind == .lgTV }), !pin.isEmpty {
+        // LG TV 확인되면 저장 후 PIN 상태에 맞춰 다음 연결 단계까지 진행
+        if let first = discoveredDevices.first(where: { $0.verified && $0.kind == .lgTV }) {
             tvIP = first.ip
             saveState()
-            await connect()
+            if pin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                await requestPIN()
+            } else {
+                await connect()
+            }
         }
     }
 
@@ -390,7 +384,7 @@ class TVController: ObservableObject {
 
     /// 포트 8080이 열려있으면 후보에 유지하고, LG TV / 프린터 / 기타를 판별한다.
     nonisolated private func verifyLGTV(ip: String, location: String, server: String) async -> (reachable: Bool, verified: Bool, label: String, kind: DeviceKind) {
-        guard await isPortOpen(ip: ip, timeoutMs: 2000) else { return (false, false, "", .unknown) }
+        guard await isPortOpen(ip: ip, timeoutMs: 1200) else { return (false, false, "", .unknown) }
 
         let ssdpServerLooksLikeLG = looksLikeLGServer(server)
 

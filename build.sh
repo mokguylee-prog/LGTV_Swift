@@ -14,7 +14,7 @@ PROJECT_NAME="$(grep -m1 'name:' Package.swift | sed 's/.*name:[[:space:]]*"\(.*
 
 # 빌드 설정 (기본: release)
 CONFIG="${1:-release}"
-APP_VERSION="1.2"
+APP_VERSION="1.3"
 BUILD_DATE="$(date +%Y.%m.%d)"
 
 if [[ "$CONFIG" != "debug" && "$CONFIG" != "release" ]]; then

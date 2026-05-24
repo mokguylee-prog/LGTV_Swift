@@ -14,10 +14,10 @@ actor SSDPDiscovery {
     private static let multicastAddr = "239.255.255.250"
     private static let ssdpPort: UInt16 = 1900
     private static let bcastPort: UInt16 = 1990
-    private static let timeout: TimeInterval = 3.5
-    private static let receivePollTimeoutUsec: Int = 350_000
+    private static let timeout: TimeInterval = 2.0
+    private static let receivePollTimeoutUsec: Int = 200_000
     private static let tvPort: Int32 = 8080
-    private static let portScanConcurrency = 48
+    private static let portScanConcurrency = 50
 
     private static let ssdpTargets = [
         "urn:schemas-upnp-org:device:MediaRenderer:1",
@@ -268,7 +268,7 @@ actor SSDPDiscovery {
 
         var writeFDs = fd_set()
         fdSet(sock, set: &writeFDs)
-        var tv = timeval(tv_sec: 0, tv_usec: 600_000)
+        var tv = timeval(tv_sec: 0, tv_usec: 300_000)
 
         let selected = select(sock + 1, nil, &writeFDs, nil, &tv)
         guard selected > 0 else { return false }

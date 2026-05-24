@@ -8,7 +8,7 @@ struct LGNetCastApp: App {
     @StateObject private var tv = TVController()
 
     private var appVersion: String {
-        let ver  = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2"
+        let ver  = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.3"
         let date = Bundle.main.infoDictionary?["CFBundleBuildDate"] as? String ?? "2026.05.23"
         return "v\(ver)  (\(date))"
     }
@@ -31,7 +31,7 @@ struct LGNetCastApp: App {
             ConnectionWindowView()
                 .environmentObject(tv)
         }
-        .windowResizability(.contentSize)
+        .windowResizability(.contentMinSize)
         .defaultPosition(.topTrailing)
 
         // ── Menu-bar extra ─────────────────────────────────────────────────

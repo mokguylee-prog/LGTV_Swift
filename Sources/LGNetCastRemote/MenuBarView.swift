@@ -88,7 +88,7 @@ struct MenuBarView: View {
 
     private func openRemoteWindow() {
         let menuWindow = NSApp.keyWindow
-        openWindow(id: "remote")
+        openWindow(id: tv.connectionState.isConnected ? "remote" : "connection")
         NSApp.activate(ignoringOtherApps: true)
         dismiss()
 

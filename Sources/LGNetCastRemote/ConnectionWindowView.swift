@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ConnectionWindowView: View {
     @EnvironmentObject var tv: TVController
-    @State private var isPortLogExpanded = false
+    @State private var isPortLogExpanded = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -14,7 +14,14 @@ struct ConnectionWindowView: View {
             Divider()
             statusBar
         }
-        .frame(width: 400)
+        .frame(
+            minWidth: 400,
+            idealWidth: 500,
+            maxWidth: .infinity,
+            minHeight: 420,
+            idealHeight: 560,
+            maxHeight: .infinity
+        )
     }
 
     // MARK: - IP row
@@ -29,6 +36,7 @@ struct ConnectionWindowView: View {
                 .textFieldStyle(.roundedBorder)
                 .font(.system(.body, design: .monospaced))
             Button {
+                isPortLogExpanded = true
                 Task { await tv.discover() }
             } label: {
                 if tv.isScanning {
@@ -61,6 +69,7 @@ struct ConnectionWindowView: View {
 
             if tv.isScanning {
                 scanProgressView
+                    .frame(maxHeight: .infinity, alignment: .top)
             } else if tv.discoveredDevices.isEmpty {
                 Text("검색 버튼을 눌러 TV를 찾으세요")
                     .font(.caption)
@@ -83,6 +92,7 @@ struct ConnectionWindowView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     private var deviceSummary: some View {
@@ -140,9 +150,11 @@ struct ConnectionWindowView: View {
             // IP 스캔 로그
             if !tv.portLog.isEmpty {
                 portLogView
+                    .layoutPriority(1)
             }
         }
         .padding(.vertical, 6)
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     private var portLogView: some View {
@@ -180,11 +192,10 @@ struct ConnectionWindowView: View {
                                 Text(entry.ip)
                                     .font(.system(size: 11, design: .monospaced))
                                     .foregroundColor(entry.open ? .green : .secondary)
-                                if entry.open {
-                                    Text("응답")
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .foregroundColor(.green)
-                                }
+                                Spacer(minLength: 8)
+                                Text(entry.open ? "열림" : "닫힘")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(entry.open ? .green : .secondary)
                             }
                             .id(idx)
                         }
@@ -192,7 +203,10 @@ struct ConnectionWindowView: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                 }
-                .frame(height: isPortLogExpanded ? 180 : 58)
+                .frame(
+                    minHeight: isPortLogExpanded ? 220 : 58,
+                    maxHeight: isPortLogExpanded ? .infinity : 58
+                )
                 .background(Color.black.opacity(0.06))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .onChange(of: tv.portLog.count) { _ in
@@ -200,6 +214,13 @@ struct ConnectionWindowView: View {
                         withAnimation { proxy.scrollTo(last, anchor: .bottom) }
                     }
                 }
+            }
+            .layoutPriority(1)
+        }
+        .frame(maxHeight: .infinity, alignment: .top)
+        .onChange(of: tv.isScanning) { scanning in
+            if scanning {
+                isPortLogExpanded = true
             }
         }
     }
