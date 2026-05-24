@@ -1,0 +1,53 @@
+TV IP: 172.30.1.44
+인증: /hdcp/api/auth
+명령 endpoint: /hdcp/api/dtv_wifirc
+마우스/터치패드 명령: HandleTouchMove, HandleTouchClick
+즉 이 TV는 UDAP 마우스가 아니라, 기존 HDCP 리모컨 API 안에서 터치패드를 받습니다.
+
+테스트 결과:
+
+text
+
+
+AUTH /hdcp/api/auth
+=> 200 OK
+session = 1303753619
+
+HandleTouchMove -> /hdcp/api/dtv_wifirc
+=> 200 OK
+
+HandleTouchClick -> /hdcp/api/dtv_wifirc
+=> 200 OK
+
+HandleTouchWheel -> /hdcp/api/dtv_wifirc
+=> 400 Bad Request
+그리고 방금 실제로 커서 이동 확인용으로 클릭 없이 사각형 이동 패턴을 보냈습니다:
+
+text
+
+
+dx=45, dy=0   여러 번
+dx=0,  dy=45  여러 번
+dx=-45,dy=0   여러 번
+dx=0,  dy=-45 여러 번
+전부 200 OK로 TV가 받았습니다.
+
+정확한 XML 형태는 이겁니다:
+
+xml
+
+<command>
+  <session>1303753619</session>
+  <type>HandleTouchMove</type>
+  <x>45</x>
+  <y>0</y>
+</command>
+클릭은:
+
+xml
+
+<command>
+  <session>1303753619</session>
+  <type>HandleTouchClick</type>
+</command>
+정리하면, TV가 터치패드/마우스를 지원한다는 말이 맞았습니다. 문제는 현재 우리가 넣은 앱 코드가 /udap/api/command 쪽으로 보내고 있어서 안 된 겁니다. 이 TV에서는 /hdcp/api/dtv_wifirc + session + HandleTouchMove 방식으로 구현해야 합니다.

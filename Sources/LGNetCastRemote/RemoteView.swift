@@ -219,7 +219,7 @@ struct RemoteView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     VStack(spacing: 0) {
-                        innerContent
+                        panelContent
                     }
                     .padding(8)
                     .background(Color.bodyBg)
@@ -246,23 +246,28 @@ struct RemoteView: View {
                 systemImage: "rectangle.grid.3x2",
                 isSelected: selectedMode == .remote
             ) {
-                selectedMode = .remote
+                selectMode(.remote)
             }
             RemoteModeButton(
-                title: "단축",
-                systemImage: "bolt.fill",
+                title: "휠",
+                systemImage: "dial.low",
                 isSelected: selectedMode == .shortcuts
             ) {
-                selectedMode = .shortcuts
+                selectMode(.shortcuts)
             }
             RemoteModeButton(
-                title: "마우스",
+                title: "패드",
                 systemImage: "cursorarrow",
                 isSelected: selectedMode == .mouse
             ) {
-                selectedMode = .mouse
+                selectMode(.mouse)
             }
         }
+    }
+
+    private func selectMode(_ mode: RemotePanelMode) {
+        selectedMode = mode
+        Task { await tv.setMouseCursorVisible(mode == .mouse) }
     }
 
     private var stateColor: Color {
@@ -277,7 +282,19 @@ struct RemoteView: View {
     // ── Inner remote body ──────────────────────────────────────────────────
 
     @ViewBuilder
-    private var innerContent: some View {
+    private var panelContent: some View {
+        switch selectedMode {
+        case .remote:
+            remoteContent
+        case .shortcuts:
+            shortcutContent
+        case .mouse:
+            MouseRemoteView(onExitMode: { selectMode(.remote) })
+                .environmentObject(tv)
+        }
+    }
+
+    private var remoteContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             powerRow
             HStack(alignment: .top, spacing: 8) {
@@ -287,6 +304,11 @@ struct RemoteView: View {
         }
         .padding(15)
         .background(Color.innerBg)
+    }
+
+    private var shortcutContent: some View {
+        WheelView()
+            .environmentObject(tv)
     }
 
     // ── Power row ──────────────────────────────────────────────────────────

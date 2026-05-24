@@ -220,6 +220,62 @@ class TVController: ObservableObject {
         return false
     }
 
+    // MARK: - Mouse Input (legacy HDCP touchpad)
+
+    @discardableResult
+    func setMouseCursorVisible(_ visible: Bool) async -> Bool {
+        guard visible else { return true }
+
+        // 2011 NetCast HDCP does not accept CursorVisible. A tiny move wakes the
+        // TV cursor without changing the user's pointer position in practice.
+        let shown = await sendLegacyTouchCommand(
+            type: "HandleTouchMove",
+            fields: "<x>1</x>\n            <y>0</y>",
+            timeout: 1.5
+        )
+        if shown {
+            _ = await sendLegacyTouchCommand(
+                type: "HandleTouchMove",
+                fields: "<x>-1</x>\n            <y>0</y>",
+                timeout: 1.5
+            )
+        }
+        return shown
+    }
+
+    @discardableResult
+    func sendMouseMove(deltaX: Int, deltaY: Int) async -> Bool {
+        guard deltaX != 0 || deltaY != 0 else { return true }
+
+        return await sendLegacyTouchCommand(
+            type: "HandleTouchMove",
+            fields: "<x>\(deltaX)</x>\n            <y>\(deltaY)</y>",
+            keepAlive: true,
+            timeout: 1.5
+        )
+    }
+
+    @discardableResult
+    func sendMouseClick() async -> Bool {
+        _ = await setMouseCursorVisible(true)
+        return await sendLegacyTouchCommand(type: "HandleTouchClick", timeout: 2)
+    }
+
+    @discardableResult
+    func sendMouseWheel(up: Bool) async -> Bool {
+        _ = await setMouseCursorVisible(true)
+
+        let ok = await sendLegacyTouchCommand(
+            type: "HandleTouchWheel",
+            fields: "<value>\(up ? "up" : "down")</value>",
+            timeout: 2
+        )
+        if !ok {
+            statusMessage = "이 TV는 터치패드 휠 명령을 지원하지 않습니다"
+        }
+        return ok
+    }
+
     // MARK: - Device Discovery
 
     func discover() async {
@@ -293,13 +349,13 @@ class TVController: ObservableObject {
 
     // MARK: - Helpers
 
-    private func post(url: URL, body: String, timeout: TimeInterval = 5) async throws -> (Data, URLResponse) {
+    private func post(url: URL, body: String, keepAlive: Bool = false, timeout: TimeInterval = 5) async throws -> (Data, URLResponse) {
         var req = URLRequest(url: url, timeoutInterval: timeout)
         req.httpMethod = "POST"
         req.setValue("application/atom+xml", forHTTPHeaderField: "Content-Type")
         req.setValue("application/atom+xml", forHTTPHeaderField: "Accept")
         req.setValue("iPhone",               forHTTPHeaderField: "User-Agent")
-        req.setValue("close",                forHTTPHeaderField: "Connection")
+        req.setValue(keepAlive ? "Keep-Alive" : "close", forHTTPHeaderField: "Connection")
         req.httpBody = body.data(using: .utf8)
         return try await session.data(for: req)
     }
@@ -310,6 +366,38 @@ class TVController: ObservableObject {
         let value = String(xml[start.upperBound..<end.lowerBound])
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty ? nil : value
+    }
+
+    private func sendLegacyTouchCommand(
+        type: String,
+        fields: String = "",
+        keepAlive: Bool = false,
+        timeout: TimeInterval = 2
+    ) async -> Bool {
+        if !connectionState.isConnected { await connect() }
+        guard let sessionID = connectionState.session else { return false }
+
+        let fieldBlock = fields.isEmpty ? "" : "\n            \(fields)"
+        let xml = """
+        <?xml version="1.0" encoding="utf-8"?>
+        <command>
+            <session>\(sessionID)</session>
+            <type>\(type)</type>\(fieldBlock)
+        </command>
+        """
+
+        guard let url = URL(string: "\(baseURL)/dtv_wifirc") else { return false }
+
+        do {
+            let (_, response) = try await post(url: url, body: xml, keepAlive: keepAlive, timeout: timeout)
+            if let http = response as? HTTPURLResponse, http.statusCode == 200 {
+                return true
+            }
+        } catch {
+            return false
+        }
+
+        return false
     }
 
     private func buildDevices(from candidates: [SSDPCandidate]) async -> [TVDevice] {
