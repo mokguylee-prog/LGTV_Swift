@@ -8,7 +8,14 @@ struct WheelView: View {
     @State private var version:   Int    = 1
     @State private var sliderVal: Double = 0.75
 
-    private var friction: CGFloat { CGFloat(0.90 + sliderVal * 0.09) }
+    // 슬라이더 0.0(최저) → 1.0(최고) 를 friction 0.82…0.97 으로 매핑
+    // 범위를 넓혀 체감 차이를 뚜렷하게 함
+    private var frictionBinding: Binding<CGFloat> {
+        Binding(
+            get: { CGFloat(0.82 + self.sliderVal * 0.15) },
+            set: { _ in }
+        )
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -37,10 +44,10 @@ struct WheelView: View {
                         .padding(.leading, 8)
                     Spacer()
                     CylinderWheelControl(label: "소리", upKey: .volUp, downKey: .volDown,
-                                         friction: friction)
+                                         friction: frictionBinding)
                     Spacer()
                     CylinderWheelControl(label: "채널", upKey: .chUp,  downKey: .chDown,
-                                         friction: friction)
+                                         friction: frictionBinding)
                     Spacer()
                 }
             } else {

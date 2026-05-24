@@ -1,25 +1,34 @@
 import SwiftUI
+import Combine
 
-// MARK: - V1: Cylinder trim-wheel with inertia
+// MARK: - V1: Cylinder trim-wheel
 
 struct CylinderWheelControl: View {
     let label:    String
     let upKey:    LGKey
     let downKey:  LGKey
-    let friction: CGFloat
+    @Binding var friction: CGFloat     // 0.90…0.98, 슬라이더 실시간 연결
 
     @EnvironmentObject var tv: TVController
+    @StateObject private var engine = InertiaEngine()
 
+    // Visual
     @State private var wheelOffset: CGFloat = 0
     @State private var flashText:   String  = ""
     @State private var flashOp:     Double  = 0
 
+    // 드래그 중 키 누적
     @State private var lastDragY:   CGFloat = 0
     @State private var pendingKeys: CGFloat = 0
-    @State private var posWin: [(y: CGFloat, t: Date)] = []
 
+    // ── 속도 측정: delta-ring (이동 중인 샘플만 수집)
+    // v.velocity.height는 macOS 마우스 드래그 시 0을 반환하는 경우가 있어
+    // 직접 측정한 링 버퍼를 1차, OS 값을 2차 검증으로 사용.
+    @State private var velRing: [(delta: CGFloat, t: Date)] = []
+
+    // 관성 중 키 누적
+    @State private var keyAccum:  CGFloat = 0
     @State private var scrollAcc: CGFloat = 0
-    @State private var coastTask: Task<Void, Never>? = nil
 
     private let basePx: CGFloat = 22
 
@@ -49,86 +58,86 @@ struct CylinderWheelControl: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(Color(white: 0.58))
         }
-        .onDisappear { coastTask?.cancel() }
+        // ── 물리 프레임: PassthroughSubject → onReceive (프레임 누락 없음)
+        .onReceive(engine.tick) { dist in
+            wheelOffset += dist
+            keyAccum    += dist
+            while keyAccum <= -basePx { keyAccum += basePx; flash("+"); Task { await tv.sendKey(upKey)   } }
+            while keyAccum >=  basePx { keyAccum -= basePx; flash("−"); Task { await tv.sendKey(downKey) } }
+        }
+        // ── 슬라이더 변경 → 진행 중 관성에 즉시 반영
+        .onReceive(Just(friction)) { fr in
+            engine.setFriction(fr)
+        }
+        .onDisappear { engine.cancel() }
     }
 
-    // MARK: Drag gesture
+    // MARK: – Drag gesture
 
     private var drag: some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { v in
-                coastTask?.cancel(); coastTask = nil
+                if engine.isRunning { engine.cancel(); keyAccum = 0 }
 
+                let now   = Date()
                 let delta = v.translation.height - lastDragY
                 lastDragY = v.translation.height
+
+                // delta-ring: 실제로 움직인 샘플만 수집 (정지 샘플 배제)
+                if abs(delta) > 0.2 {
+                    velRing.append((delta: delta, t: now))
+                }
+                // 최근 100ms만 유지
+                velRing.removeAll { now.timeIntervalSince($0.t) > 0.10 }
+
                 wheelOffset += delta
                 pendingKeys += delta
-
-                while pendingKeys <= -basePx { pendingKeys += basePx; flash("+"); Task { await tv.sendKey(upKey) } }
-                while pendingKeys >= basePx  { pendingKeys -= basePx; flash("−"); Task { await tv.sendKey(downKey) } }
-
-                let now = Date()
-                posWin.append((y: v.translation.height, t: now))
-                posWin.removeAll { now.timeIntervalSince($0.t) > 0.12 }
+                while pendingKeys <= -basePx { pendingKeys += basePx; flash("+"); Task { await tv.sendKey(upKey)   } }
+                while pendingKeys >=  basePx { pendingKeys -= basePx; flash("−"); Task { await tv.sendKey(downKey) } }
             }
-            .onEnded { _ in
-                lastDragY   = 0
+            .onEnded { v in
+                // ── 속도 계산 (1차: delta-ring, 2차: OS velocity)
+                var vel: CGFloat = 0
+
+                // 1차: 링 버퍼 — 이동 샘플만 포함, 정지 직전 이벤트 영향 없음
+                if velRing.count >= 2,
+                   let first = velRing.first, let last = velRing.last {
+                    let span = CGFloat(last.t.timeIntervalSince(first.t))
+                    if span > 0.001 {
+                        let totalDelta = velRing.reduce(CGFloat(0)) { $0 + $1.delta }
+                        vel = totalDelta / span
+                    }
+                } else if velRing.count == 1 {
+                    // 단 하나의 샘플: 해당 delta를 짧은 시간 기준으로 추정
+                    vel = velRing[0].delta / 0.008   // ~8ms 이벤트 간격 가정
+                }
+
+                // 2차: OS velocity — 링 버퍼보다 크면 OS 값 채택 (정밀할 경우 우선)
+                if #available(macOS 14, *) {
+                    let osVel = v.velocity.height
+                    if abs(osVel) > abs(vel) { vel = osVel }
+                }
+
+                // 리셋
+                keyAccum    = 0
                 pendingKeys = 0
+                lastDragY   = 0
+                velRing.removeAll()
 
-                let now    = Date()
-                let recent = posWin.filter { now.timeIntervalSince($0.t) <= 0.08 }
-                let win    = recent.count >= 2 ? recent : posWin
-
-                let vel: CGFloat
-                if win.count >= 2, let first = win.first, let last = win.last {
-                    let dt = CGFloat(last.t.timeIntervalSince(first.t))
-                    vel = dt > 0.001 ? (last.y - first.y) / dt : 0
-                } else { vel = 0 }
-                posWin.removeAll()
-                startCoast(velocity: vel, fr: friction)
+                engine.kick(velocity: vel, friction: friction)
             }
     }
 
-    // MARK: Inertia loop
+    // MARK: – Mouse scroll wheel
 
-    private func startCoast(velocity: CGFloat, fr: CGFloat) {
-        guard abs(velocity) > 5 else { return }
-        coastTask = Task { @MainActor in
-            var vel      = velocity
-            var keyAccum = CGFloat(0)
-            var lastTime = Date.now
-
-            while !Task.isCancelled && abs(vel) > 0.5 {
-                try? await Task.sleep(nanoseconds: 16_666_000)
-                guard !Task.isCancelled else { break }
-
-                let now  = Date.now
-                let dt   = CGFloat(now.timeIntervalSince(lastTime))
-                lastTime = now
-                guard dt > 0.001 && dt < 0.1 else { continue }
-
-                let decay = CGFloat(pow(Double(fr), Double(dt * 60.0)))
-                let dist  = vel * dt
-
-                wheelOffset += dist
-                keyAccum    += dist
-
-                while keyAccum <= -basePx { keyAccum += basePx; Task { await tv.sendKey(upKey) } }
-                while keyAccum >= basePx  { keyAccum -= basePx; Task { await tv.sendKey(downKey) } }
-
-                vel *= decay
-            }
-        }
-    }
-
-    // MARK: Scroll wheel
-
-    private func handleScroll(_ delta: CGFloat) {
-        coastTask?.cancel(); coastTask = nil
-        scrollAcc += delta
-        while scrollAcc >= 5  { scrollAcc -= 5; wheelOffset -= 15; flash("+"); Task { await tv.sendKey(upKey) } }
+    private func handleScroll(_ d: CGFloat) {
+        engine.cancel()
+        scrollAcc += d
+        while scrollAcc >=  5 { scrollAcc -= 5; wheelOffset -= 15; flash("+"); Task { await tv.sendKey(upKey)   } }
         while scrollAcc <= -5 { scrollAcc += 5; wheelOffset += 15; flash("−"); Task { await tv.sendKey(downKey) } }
     }
+
+    // MARK: – Flash
 
     private func flash(_ sign: String) {
         flashText = sign
@@ -137,7 +146,7 @@ struct CylinderWheelControl: View {
     }
 }
 
-// MARK: - Trim wheel body (Canvas-drawn ridges)
+// MARK: - Trim wheel body (Canvas ridges)
 
 private struct TrimWheelBody: View {
     let stripeOffset: CGFloat
@@ -165,28 +174,23 @@ private struct TrimWheelBody: View {
                 while y < size.height + sp {
                     let d  = min(abs(y - half) / (half + 12), 1.0)
                     let cf = CGFloat(1.0 - d * 0.72)
-
-                    let hlOp = Double(cf * 0.93)
-                    if hlOp > 0.02 {
-                        var p = Path(); p.move(to: CGPoint(x: 4, y: y)); p.addLine(to: CGPoint(x: size.width - 4, y: y))
-                        ctx.stroke(p, with: .color(Color(white: 0.92).opacity(hlOp)), lineWidth: 3.2)
+                    if cf * 0.93 > 0.02 {
+                        var p = Path(); p.move(to: .init(x: 4, y: y)); p.addLine(to: .init(x: size.width-4, y: y))
+                        ctx.stroke(p, with: .color(Color(white: 0.92).opacity(Double(cf*0.93))), lineWidth: 3.2)
                     }
-                    let midOp = Double(cf * 0.38)
-                    if midOp > 0.02 {
-                        var p = Path(); p.move(to: CGPoint(x: 4, y: y + 3.5)); p.addLine(to: CGPoint(x: size.width - 4, y: y + 3.5))
-                        ctx.stroke(p, with: .color(Color(white: 0.40).opacity(midOp)), lineWidth: 1.8)
+                    if cf * 0.38 > 0.02 {
+                        var p = Path(); p.move(to: .init(x: 4, y: y+3.5)); p.addLine(to: .init(x: size.width-4, y: y+3.5))
+                        ctx.stroke(p, with: .color(Color(white: 0.40).opacity(Double(cf*0.38))), lineWidth: 1.8)
                     }
-                    let shOp = Double(cf * 0.97)
-                    if shOp > 0.02 {
-                        var p = Path(); p.move(to: CGPoint(x: 4, y: y + 7.0)); p.addLine(to: CGPoint(x: size.width - 4, y: y + 7.0))
-                        ctx.stroke(p, with: .color(Color.black.opacity(shOp)), lineWidth: 4.8)
+                    if cf * 0.97 > 0.02 {
+                        var p = Path(); p.move(to: .init(x: 4, y: y+7.0)); p.addLine(to: .init(x: size.width-4, y: y+7.0))
+                        ctx.stroke(p, with: .color(Color.black.opacity(Double(cf*0.97))), lineWidth: 4.8)
                     }
                     y += sp
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: r))
 
-            // Top / bottom fade vignette
             VStack(spacing: 0) {
                 LinearGradient(colors: [Color.black.opacity(0.88), Color.black.opacity(0.28), .clear],
                                startPoint: .top, endPoint: .bottom).frame(height: 50)
@@ -196,7 +200,6 @@ private struct TrimWheelBody: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: r))
 
-            // Left edge highlight
             HStack {
                 LinearGradient(colors: [Color(white: 1.0).opacity(0.14), .clear],
                                startPoint: .leading, endPoint: .trailing).frame(width: 22)
@@ -204,7 +207,6 @@ private struct TrimWheelBody: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: r))
 
-            // Border
             RoundedRectangle(cornerRadius: r)
                 .stroke(LinearGradient(
                     colors: [Color(white: 0.68), Color(white: 0.18), Color(white: 0.44)],
