@@ -48,12 +48,13 @@ Session tokens expire; `TVController.sendKey()` auto-reconnects when it detects 
 
 ### Device discovery
 
-`SSDPDiscovery` (actor) runs three strategies in order, stopping when any yields results:
-1. **SSDP M-SEARCH** — UDP multicast to `239.255.255.250:1900`
-2. **B-SEARCH** — UDP broadcast to `255.255.255.255:1990`
-3. **Port scan** — concurrent TCP connects to `:8080` across the local `/24` subnet
+Rules follow the LGTV_Remocon (ESP32) field tests:
+1. **SSDP M-SEARCH** — UDP multicast to `239.255.255.250:1900`, ST `upnp:rootdevice`, then `ssdp:all` only if empty. No B-SEARCH / `udap:rootservice` (the TV never answers them).
+2. **Port scan** (manual search window only) — concurrent TCP connects to `:8080` across the local `/24` subnet
 
-All three use raw BSD sockets via Darwin (no Network.framework). The app sandbox must be **disabled** for raw sockets and multicast to work.
+A candidate is adopted and saved only after TCP 8080 **and** an AuthReq session succeed (LGE-signed candidates first) — a printer on the LAN also listens on 8080. `TVController+Health` re-discovers via SSDP at launch if the saved IP is gone, and runs a 1.5s TCP health check (3 misses → reconnect/rediscover, retry every 3s). PIN rejection (`.error`) is never auto-retried.
+
+Both use raw BSD sockets via Darwin (no Network.framework). The app sandbox must be **disabled** for raw sockets and multicast to work.
 
 ### Key files
 

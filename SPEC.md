@@ -1,6 +1,6 @@
 # LG NetCast Remote — 기술 사양서 (SPEC)
 
-> 버전 v1.6 · 최종 수정 2026-05-25
+> 버전 v1.8 · 최종 수정 2026-10-09
 
 ---
 
@@ -94,32 +94,55 @@ POST /hdcp/api/dtv_wifirc  (또는 /hdcp/api/command)
 
 ## 4. 기기 탐색 (SSDPDiscovery)
 
-### 4.1 탐색 전략 (병렬 실행)
+### 4.1 탐색 전략
+
+LGTV_Remocon(ESP32) 실측 결과를 그대로 따른다.
 
 ```
-┌─────────────────────────────────────────┐
-│  SSDP M-SEARCH (UDP 239.255.255.250:1900)│ ── 동시 실행
-│  B-SEARCH (UDP 255.255.255.255:1990)    │
-└────────────────┬────────────────────────┘
-                 │ + 포트 스캔 병렬 실행
-┌────────────────▼────────────────────────┐
+┌──────────────────────────────────────────┐
+│  SSDP M-SEARCH (UDP 239.255.255.250:1900)│  ST: upnp:rootdevice
+│  허탕이면 ST: ssdp:all 로 한 번 더       │  MX: 2, 2.5초 수집
+└────────────────┬─────────────────────────┘
+                 │ (수동 검색일 때만) + 포트 스캔 병렬 실행
+┌────────────────▼─────────────────────────┐
 │  TCP Port 8080 스캔 (동시 50개)          │
-│  활성 NIC 전체 /24 서브넷               │
-└────────────────┬────────────────────────┘
+│  활성 NIC 전체 /24 서브넷                │
+└────────────────┬─────────────────────────┘
                  │
-┌────────────────▼────────────────────────┐
-│  후보 IP별 검증 (병렬)                   │
-│  1. UPnP LOCATION XML 파싱              │
+┌────────────────▼─────────────────────────┐
+│  후보 IP별 표시용 분류 (병렬)            │
+│  1. UPnP LOCATION XML 파싱               │
 │  2. 루트 페이지 Server 헤더              │
-│  3. /hdcp/api 응답 코드                 │
-└─────────────────────────────────────────┘
+│  3. /hdcp/api 응답 코드 (404/405 제외)   │
+└────────────────┬─────────────────────────┘
+                 │
+┌────────────────▼─────────────────────────┐
+│  채택: LGE 후보부터 8080 핑(800ms)       │
+│        → AuthReq 세션 획득까지 통과해야  │
+│        저장. 모두 실패하면 IP 그대로 둠  │
+└──────────────────────────────────────────┘
 ```
+
+- **B-SEARCH(255.255.255.255:1990), `udap:rootservice` 는 쓰지 않는다.** 42LW5700 이 응답하지 않는다.
+- 응답은 임시 포트로 유니캐스트로 돌아오므로 멀티캐스트 그룹 가입(IGMP)은 하지 않는다.
+- `SERVER` 헤더의 `LGE` (예: `LGE_DLNA_SDK/1.5.0`) 가 LG 기기 표식이다.
+- **8080 만 보고 TV 로 단정하지 않는다.** 같은 망의 HP 프린터가 8080 을 열고 AuthReq 에 405 를 돌려준다.
+
+### 4.1.1 자동 재연결 / 헬스체크 (`TVController+Health`)
+
+| 항목 | 값 |
+|---|---|
+| 시작 시 | 저장된 IP 8080 열림 → AuthReq. 응답 없으면 SSDP 재탐색 → 새 IP 저장 |
+| 헬스체크 | 연결 중 1.5초마다 TCP 8080 핑 (타임아웃 1.8초), 3회 연속 실패 시 끊김 |
+| 끊긴 뒤 | 저장 IP → SSDP 순으로 재시도, 실패하면 3초 간격 반복 (TV 를 켜면 자동 연결) |
+| PIN 거부 | `.error` (빨강) — 자동 재시도하지 않음. 네트워크 오류는 `.disconnected` (회색) |
+| 보류 | PIN 요청 직후, 사용자가 목록에서 IP 를 직접 고른 직후 |
 
 ### 4.2 기기 분류
 
 | 종류 | 판별 기준 |
 |---|---|
-| `lgTV` | manufacturer=LG + TV hint, 또는 Server에 LG/NETCAST/UDAP, 또는 본문에 HDCP/NETCAST |
+| `lgTV` | manufacturer=LG + TV hint, 또는 Server에 LGE/NETCAST/UDAP, 또는 본문에 HDCP/NETCAST (표시용 — 채택은 AuthReq 로 결정) |
 | `printer` | Server에 HP HTTP / EPSON / CANON 등 |
 | `unknown` | 포트 열림 확인만 된 경우 |
 
@@ -142,10 +165,11 @@ macOS `SO_SNDTIMEO`는 `connect()`에 미적용 → **non-blocking socket + `sel
 | 확장 파일 | 책임 |
 |---|---|
 | `TVController.swift` | 상태 선언 · init · isPortOpen · 공유 헬퍼 (post/parseTag/setError) |
-| `+Auth` | requestPIN / connect |
+| `+Auth` | requestPIN / connect / authenticate(ip:) |
 | `+Keys` | sendKey / sendKeyCode / sendLegacyTouchCommand |
 | `+Mouse` | setMouseCursorVisible / sendMouseMove / sendMouseClick / sendMouseWheel |
-| `+Discovery` | discover / selectDevice / buildDevices / orderDevices |
+| `+Discovery` | discover / discoverAndConnect / adoptFirstAuthenticated / selectDevice |
+| `+Health` | startHealthMonitor / recover (헬스체크 + 자동 재탐색) |
 | `+Verify` | verifyLGTV / looksLikeLGServer / looksLikePrinter |
 
 ### 5.2 RemoteView
@@ -241,7 +265,7 @@ swift build -c release
 # → backup.sh 자동 실행 (ZIP)
 ```
 
-App Sandbox 비활성 이유: raw BSD 소켓 (SSDP 멀티캐스트, UDP 브로드캐스트) 사용.
+App Sandbox 비활성 이유: raw BSD 소켓 (SSDP 멀티캐스트, TCP 포트 스캔) 사용.
 
 ---
 

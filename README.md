@@ -122,13 +122,18 @@ WPF RemoteWindow.xaml 디자인을 그대로 재현한 리모컨 스킨.
 
 ## 기기 탐색 전략
 
-`SSDPDiscovery` actor가 병렬로 실행:
+LGTV_Remocon(ESP32) 실측 규칙을 따른다.
 
-1. **SSDP M-SEARCH** — UDP 멀티캐스트 `239.255.255.250:1900`
-2. **B-SEARCH** — UDP 브로드캐스트 `255.255.255.255:1990`
-3. **포트 스캔** — 활성 인터페이스 전체 `/24` 서브넷 TCP 8080 (동시 50개)
+1. **SSDP M-SEARCH** — UDP 멀티캐스트 `239.255.255.250:1900`, ST `upnp:rootdevice` → 허탕이면 `ssdp:all`
+2. **포트 스캔** (수동 검색 시만) — 활성 인터페이스 전체 `/24` 서브넷 TCP 8080 (동시 50개)
 
-각 후보를 UPnP XML → 루트 페이지 헤더 → HDCP API 순으로 LG TV 여부 검증.
+B-SEARCH(`255.255.255.255:1990`)와 `udap:rootservice` 는 42LW5700 이 응답하지 않아 쓰지 않는다.
+
+후보는 `SERVER` 에 `LGE` 가 있는 것부터 **8080 핑 → AuthReq 세션 획득**까지 통과해야 저장한다
+(같은 망의 HP 프린터가 8080 을 열고 있어서 포트만으로는 판단하지 않는다).
+
+시작할 때 저장된 IP 에 TV 가 없으면 SSDP 로 다시 찾고, 연결 중엔 1.5초마다 헬스체크해서
+끊기면 자동으로 재탐색·재연결한다 (TV 를 껐다 켜도 알아서 붙는다).
 
 ---
 
@@ -155,7 +160,7 @@ Sources/LGNetCastRemote/
 │   └── TVController+Verify.swift       # verifyLGTV / 기기 분류
 │
 ├── Discovery
-│   ├── SSDPDiscovery.swift             # actor · M-SEARCH · B-SEARCH
+│   ├── SSDPDiscovery.swift             # actor · M-SEARCH (rootdevice → ssdp:all)
 │   ├── SSDPDiscovery+PortScan.swift    # 포트 스캔 · checkPort
 │   └── SSDPDiscovery+Helpers.swift     # UDP 전송 · 응답 파싱 · fd_set 헬퍼
 │
@@ -206,7 +211,9 @@ Sources/LGNetCastRemote/
 
 | 버전 | 주요 변경 |
 |---|---|
-| **v1.6** | 소스 파일 분해 (12→30개, ~5KB/파일) · 메뉴바 레이아웃 고정 (연결↔퀵버튼 자리 교환) |
+| **v1.8** | TV 검색을 LGTV_Remocon 규칙으로 정리 (M-SEARCH만, rootdevice→ssdp:all, AuthReq 통과한 IP만 저장) · 시작 시 SSDP 자동 재탐색 · 1.5초 헬스체크 + 자동 재연결 · 앱 번들에 리소스 번들 포함 |
+| v1.7 | 휠 물리엔진 재구현 (delta-ring 속도측정, 120Hz 루프) |
+| v1.6 | 소스 파일 분해 (12→30개, ~5KB/파일) · 메뉴바 레이아웃 고정 (연결↔퀵버튼 자리 교환) |
 | v1.5 | 터치패드 절대맵핑 · 트림휠 리얼 스타일 + 관성 · 다이얼 V2 추가 |
 | v1.3 | 코드사인 · 앱 번들 배포 |
 | v1.0 | 최초 Swift 포팅 (Python/Tkinter/rumps → SwiftUI) |

@@ -42,7 +42,7 @@
 
 - `Sources/LGNetCastRemote/LGNetCastApp.swift`: 앱 진입점, 메뉴바, AppDelegate
 - `Sources/LGNetCastRemote/TVController.swift`: TV 통신, 인증, 키 입력, 마우스/휠 명령
-- `Sources/LGNetCastRemote/SSDPDiscovery.swift`: SSDP, B-SEARCH, 포트 스캔
+- `Sources/LGNetCastRemote/SSDPDiscovery.swift`: SSDP M-SEARCH, 포트 스캔
 - `Sources/LGNetCastRemote/ConnectionWindowView.swift`: TV 연결 설정 창
 - `Sources/LGNetCastRemote/RemoteView.swift`: 리모컨 화면 및 모드 전환
 - `Sources/LGNetCastRemote/MouseRemoteView.swift`: 마우스 모드 UI와 입력 캡처

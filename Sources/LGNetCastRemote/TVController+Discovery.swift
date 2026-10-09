@@ -5,6 +5,8 @@ import Foundation
 extension TVController {
 
     func discover() async {
+        isRecovering    = true   // 검색 중엔 헬스 루프의 자동 재탐색을 멈춘다
+        defer { isRecovering = false }
         isScanning      = true
         ssdpDone        = false
         portScanned     = 0
@@ -48,26 +50,58 @@ extension TVController {
         }
 
         let verifiedCount = orderedDevices.filter { $0.verified }.count
-        if let sel = orderedDevices.first(where: { $0.ip == tvIP && $0.kind == .lgTV }) {
-            statusMessage = "기기 \(orderedDevices.count)개 발견 (LG TV \(verifiedCount)개) - \(sel.ip) 선택됨"
-        } else {
-            statusMessage = "기기 \(orderedDevices.count)개 발견 (LG TV \(verifiedCount)개)"
+        statusMessage = "기기 \(orderedDevices.count)개 발견 (LG TV 후보 \(verifiedCount)개) — 인증 확인 중..."
+
+        // 표시용 판정(verified)은 휴리스틱일 뿐 — 실제 채택은 AuthReq 세션 획득까지 통과해야 한다.
+        let tvIPs    = orderedDevices.filter { $0.kind == .lgTV }.map(\.ip)
+        let otherIPs = orderedDevices.filter { $0.kind == .unknown }.map(\.ip)
+
+        if pin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if let first = tvIPs.first {
+                tvIP = first
+                await requestPIN()
+            }
+            return
         }
 
-        if let first = discoveredDevices.first(where: { $0.verified && $0.kind == .lgTV }) {
-            tvIP = first.ip
-            saveState()
-            if pin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                await requestPIN()
-            } else {
-                await connect()
+        if await adoptFirstAuthenticated(tvIPs + otherIPs) {
+            statusMessage = "기기 \(orderedDevices.count)개 발견 — \(tvIP) 연결됨 ✓"
+        } else {
+            statusMessage = "기기 \(orderedDevices.count)개 발견 — 인증되는 TV 없음 (PIN 확인)"
+        }
+    }
+
+    /// 자동 재탐색: SSDP(M-SEARCH) 만 돌려 LGE 후보부터 시도한다.
+    @discardableResult
+    func discoverAndConnect() async -> Bool {
+        let candidates = await SSDPDiscovery().discover(includePortScan: false)
+        return await adoptFirstAuthenticated(candidates.map(\.ip))
+    }
+
+    /// 후보를 순서대로 8080 핑(800ms) → AuthReq 로 확인해 처음 세션을 준 IP 를 채택·저장한다.
+    /// 아무도 통과하지 못하면 tvIP 는 원래 값 그대로 둔다(프린터 등을 저장하지 않음).
+    func adoptFirstAuthenticated(_ ips: [String]) async -> Bool {
+        guard !pin.isEmpty else { return false }
+        var tried = Set<String>()
+        for ip in ips where tried.insert(ip).inserted {
+            guard await isPortOpen(ip: ip, timeoutMs: 800) else { continue }
+            if case .session(let sessionID) = await authenticate(ip: ip) {
+                tvIP            = ip
+                connectionState = .connected(session: sessionID)
+                statusMessage   = "연결됨 ✓ (\(ip))"
+                autoReconnect   = true
+                healthMisses    = 0
+                saveState()
+                return true
             }
         }
+        return false
     }
 
     func selectDevice(_ device: TVDevice) {
         tvIP            = device.ip
         connectionState = .disconnected
+        autoReconnect   = false   // 사용자가 고른 IP 를 자동 재탐색이 덮어쓰지 않게
         statusMessage   = "IP 선택됨: \(device.ip)"
         saveState()
     }

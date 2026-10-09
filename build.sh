@@ -14,7 +14,7 @@ PROJECT_NAME="$(grep -m1 'name:' Package.swift | sed 's/.*name:[[:space:]]*"\(.*
 
 # 빌드 설정 (기본: release)
 CONFIG="${1:-release}"
-APP_VERSION="1.5"
+APP_VERSION="1.8"
 BUILD_DATE="$(date +%Y.%m.%d)"
 
 if [[ "$CONFIG" != "debug" && "$CONFIG" != "release" ]]; then
@@ -25,7 +25,8 @@ fi
 echo "▶  $PROJECT_NAME 빌드 중... (${CONFIG})"
 swift build -c "$CONFIG"
 
-BINARY_PATH="$(swift build -c "$CONFIG" --show-bin-path)/$PROJECT_NAME"
+BIN_DIR="$(swift build -c "$CONFIG" --show-bin-path)"
+BINARY_PATH="$BIN_DIR/$PROJECT_NAME"
 
 # ── .app 번들 조립 ────────────────────────────────────────────────────────
 APP_DIR="$SCRIPT_DIR/${PROJECT_NAME}.app"
@@ -43,6 +44,11 @@ cp "$BINARY_PATH" "$MACOS_DIR/$PROJECT_NAME"
 if [[ -f "$SCRIPT_DIR/assets/LGNetCast.icns" ]]; then
   cp "$SCRIPT_DIR/assets/LGNetCast.icns" "$RES_DIR/AppIcon.icns"
 fi
+
+# 2-1. SPM 리소스 번들 복사 (Bundle.module 은 Contents/Resources 에서 찾음)
+for bundle in "$BIN_DIR"/*.bundle; do
+  [[ -d "$bundle" ]] && cp -R "$bundle" "$RES_DIR/"
+done
 
 # 3. Info.plist 생성
 BUNDLE_ID="com.kadelee.$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]')"

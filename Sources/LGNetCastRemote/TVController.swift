@@ -28,6 +28,13 @@ class TVController: ObservableObject {
 
     let stateManager = StateManager()
 
+    // 자동 재연결 / 헬스체크 (TVController+Health.swift)
+    var autoReconnect = true
+    var healthMisses  = 0
+    var isRecovering  = false
+    var nextRetryAt   = Date.distantPast
+    var healthTask: Task<Void, Never>?
+
     let session: URLSession = {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest  = 5
@@ -44,16 +51,23 @@ class TVController: ObservableObject {
             tvIP = state.tvIP
             pin  = state.pin
         }
-        Task { await self.autoConnect() }
+        Task {
+            await self.autoConnect()
+            self.startHealthMonitor()
+        }
     }
 
+    /// 저장된 IP → (응답 없으면) SSDP 재탐색 순으로 붙는다.
     func autoConnect() async {
-        guard !tvIP.isEmpty else { return }
-        guard await isPortOpen(ip: tvIP) else {
-            statusMessage = "TV에 연결할 수 없습니다 (\(tvIP))"
+        if pin.isEmpty {
+            guard !tvIP.isEmpty, await isPortOpen(ip: tvIP) else {
+                statusMessage = "TV에 연결할 수 없습니다 (\(tvIP))"
+                return
+            }
+            await requestPIN()
             return
         }
-        if pin.isEmpty { await requestPIN() } else { await connect() }
+        await recover()
     }
 
     // MARK: - Port check (non-blocking BSD socket + select)

@@ -59,7 +59,6 @@ extension TVController {
                 if text.contains("HDCP") || text.contains("NETCAST") || text.contains("UDAP") {
                     return (true, true, "LG NetCast", .lgTV)
                 }
-                if text.contains("LG") { return (true, true, "", .lgTV) }
             }
         }
 
@@ -70,7 +69,8 @@ extension TVController {
             var req = URLRequest(url: url, timeoutInterval: 2)
             req.setValue("iPhone", forHTTPHeaderField: "User-Agent")
             if let (_, resp) = try? await session.data(for: req),
-               let http = resp as? HTTPURLResponse, http.statusCode < 500 {
+               let http = resp as? HTTPURLResponse, http.statusCode < 500,
+               ![404, 405].contains(http.statusCode) {   // 프린터 등은 405 를 돌려준다
                 return (true, true, "LG NetCast", .lgTV)
             }
         }
@@ -82,7 +82,7 @@ extension TVController {
 
     nonisolated func looksLikeLGServer(_ value: String) -> Bool {
         let u = value.uppercased()
-        return u.contains("LG") || u.contains("NETCAST") || u.contains("UDAP")
+        return u.contains("LGE") || u.contains("NETCAST") || u.contains("UDAP")
     }
 
     nonisolated private func looksLikePrinter(_ value: String) -> Bool {

@@ -14,7 +14,7 @@ struct ScanProgressView: View {
             ScanStepRow(
                 icon: "antenna.radiowaves.left.and.right",
                 label: "SSDP 검색",
-                detail: tv.ssdpDone ? "완료" : "멀티캐스트 + 브로드캐스트",
+                detail: tv.ssdpDone ? "완료" : "M-SEARCH 멀티캐스트",
                 state: tv.ssdpDone ? .done : .running
             )
             ScanStepRow(
